@@ -54,7 +54,10 @@ head(gsaba)
 
 ## lwppd.all from Aescal_Greenhous_WP_Select.R
 
-enchilada <- left_join(gsaba, lwppd.all %>% select(doy.yr, tag, lwppd_MPa), by = c("Date"="doy.yr","tag"="tag"))
+# with Rob's old janky ass dataframe
+# enchilada <- left_join(gsaba, lwppd.all %>% select(doy.yr, tag, lwppd_MPa), by = c("Date"="doy.yr","tag"="tag"))
+# with Lee's new hotness
+enchilada <- left_join(gsaba, wps.clean %>% select(doy.yr, tag, lwp.m), by = c("Date"="doy.yr","tag"="tag"))
 enchilada$treatment <- factor(enchilada$treatment)
 # make a column to destinguish when things started getting rewatered (pch=16 -> watered pch=1 -> not watered)
 enchilada$watered <- 16
@@ -62,12 +65,12 @@ enchilada$watered <- 16
 ####### Adding some derived metrics ############
 
 # set a minimum water potential for each individual
-ench <- enchilada %>% group_by(ID, tag, treatment) %>% summarise(minlwp = min(lwppd_MPa, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T))
+ench <- enchilada %>% group_by(ID, tag, treatment) %>% summarise(minlwp = min(lwp.m, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T))
 
 ench$date.min <- as.Date(NA)
 for(i in unique(enchilada$tag)){
   tmp <- enchilada[which(enchilada$tag==i),]
-  ench$date.min[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwppd_MPa == min(tmp$lwppd_MPa, na.rm=T))])
+  ench$date.min[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwp.m == min(tmp$lwp.m, na.rm=T))])
 }
 
 # add in to enchilada a column indicating min wp, and date of min so we can analyze recover
@@ -85,9 +88,9 @@ for(i in unique(enchilada$tag)){
   lines(gs~Date, enchilada[which(enchilada$tag==i),], col=treatment, lwd=2)
 }
 abline(v=as.Date("2018-06-28", "%F"))
-plot(lwppd_MPa~Date, enchilada, col=treatment, pch=16, type="n")
+plot(lwp.m~Date, enchilada, col=treatment, pch=16, type="n")
 for(i in unique(enchilada$tag)){
-  lines(lwppd_MPa~Date, enchilada[which(enchilada$tag==i & enchilada$lwppd_MPa<0),], col=treatment, lwd=2)
+  lines(lwp.m~Date, enchilada[which(enchilada$tag==i & enchilada$lwp.m<0),], col=treatment, lwd=2)
 }
 abline(v=as.Date("2018-06-28", "%F"))
 plot(ABAFWngg~Date, enchilada, col=treatment, pch=16, type="n")
@@ -99,6 +102,11 @@ abline(v=as.Date("2018-06-28", "%F"))
 #quartz.save()
 
 
+# visualizing individual WPs in different panels
+par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
+for(i in unique(enchilada$tag)){
+  plot(lwp.m~Date, enchilada[which(enchilada$tag==i & enchilada$lwp.m<0),], col=treatment, ylim=c(-6,0), xlim=as.Date(c("2018-04-27","2018-07-30")))
+}
 ### Plotting scatterplots of GS, ABA and lwp
 ggplot(gsaba, aes(x=log(ABAFWngg), y=log(gs), col=treatment)) + geom_point() #+ geom_smooth(se=F,method = "loess",span=1)
 
@@ -107,12 +115,13 @@ ggplot(gsaba[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), c
 
 
 # Gs vs LWP
-ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwppd_MPa, y=log(gs), col=log(ABAFWngg) )) + geom_point()
+ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
 ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
 
-plot(lwppd_MPa~ABAFWngg, enchilada, col=treatment)
+plot(lwp.m~ABAFWngg, enchilada, col=treatment)
+
 
 
 par(mfrow=c(3,1), mar=c(0,5,0,1), oma=c(3,2,1,0), mgp=c(3,1,0))

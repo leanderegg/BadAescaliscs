@@ -1,6 +1,8 @@
 #rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
+require(tidyr)
+require(dplyr)
 se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
 head(wpdata)
@@ -221,6 +223,59 @@ for (i in c(9:12)){
 head(complete.data)
 
 
+#### Lee's new way of processing data ########
+
+# step 1: take wide data and make it long
+# step 2: merge in quality control flags
+# step 3: aggregate things by date, filtering for bad values
+
+# take complete.data and make it long form (take 5 psy columns and make them 1 column)
+wpslong1 <- gather(select(.data = complete.data, Yr,DOY,Time,Temp,PSY1:PSY5) , key = "Psy_num", value="lwppd", PSY1:PSY5)
+
+# take qc1 and also make it long
+names(qc1)<- str_replace(names(qc1), pattern = ".qc","")
+qualcont1 <- data.frame(complete.data[,1:4], qc1[,-1])
+qclong1 <- gather(qualcont1,key = "Psy_num", value="QC_flag", PSY1:PSY5 )
+
+#merge wps and qc flags
+wps1 <- full_join(wpslong1, qclong1)
+
+
+
+# take complete.data and make it long form (take 5 psy columns and make them 1 column)
+wpslong2 <- gather(select(.data = complete.data.2, Yr,DOY,Time,Temp,PSY6:PSY9) , key = "Psy_num", value="lwppd", PSY6:PSY9)
+
+# take qc2 and also make it long
+names(qc2)<- str_replace(names(qc2), pattern = ".qc","")
+qualcont2 <- data.frame(complete.data.2[,1:4], qc2[,-1])
+qclong2 <- gather(qualcont2,key = "Psy_num", value="QC_flag", PSY6:PSY9 )
+
+#merge wps and qc flags
+wps2 <- full_join(wpslong2, qclong2)
+
+
+wps.all <- rbind(wps1, wps2)
+
+wps.clean <- wps.all %>% filter(QC_flag==TRUE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
+
+# extract individuals for matching up with tags
+wps.clean$ind <- as.numeric(str_replace(wps.clean$Psy_num,"PSY", ""))
+
+### add in a 'tag' column to match rest of dataset:
+tag <- c(590,592,589,498,10999,588,591,10954,600)
+ind <- c(1:9)
+treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
+tag.mapper <- data.frame(tag, ind, treatment)
+
+wps.clean$tag <- tag.mapper$tag[match(wps.clean$ind, tag.mapper$ind)]
+wps.clean$treatment <- tag.mapper$treatment[match(wps.clean$ind, tag.mapper$ind)]
+
+
+# convert DOY to dates so we can match
+wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")
+wps.clean$doy.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
+
+
 
 ######## taking wide form data and making it long form (and combining psys 1-5 &6-9) ##########3
 # make empty dataframe to put averaged values into
@@ -238,34 +293,34 @@ alsocheck <- c(8)
 # loop through psychrometer columns, and pull out the max wp
 for (i in c(5:9)){
   # take the max lwp from each day of measurments for a single psychrometer
-  these <- tapply(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,i],complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],max,na.rm=T) # any time we have no good readings for a day, returns -Inf
-  these <- as.vector(these)
+  max.wps <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,i],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T) # any time we have no good readings for a day, returns -Inf
+  max.wps <- as.vector(max.wps)
   # pull out day of year for each measurement
-  those <- tapply(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],max,na.rm=T)
+  sampling.doys <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T)
   
-  # some sort of weird sorting
-  include <- ifelse((i-4) %in% clean & those < 188,which(these > -1.75),c(1:length(these)))
+  # excluding wps more negative than -1.75 in pre-treatment period
+  include <- ifelse((i-4) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
     # if psychrometer is 1,
-  these <- these[include]
-  lwppd.all[c(k:c(k+(ks-1))),3] <- these
-  lwppd.all[c(k:(k+ (ks-1))),1] <- those
-  lwppd.all[c(k:(k + (ks-1))),2] <- rep(i-4,length(these))
+  max.wps <- max.wps[include]
+  lwppd.all[c(k:c(k+(ks-1))),3] <- max.wps
+  lwppd.all[c(k:(k+ (ks-1))),1] <- sampling.doys
+  lwppd.all[c(k:(k + (ks-1))),2] <- rep(i-4,length(max.wps))
   k <- k + ks
 }
 lwppd.all[which(lwppd.all[,3] > 0),3] <- NA # get rid of bad wp that are positive
 lwppd.all$lwppd_MPa[which(lwppd.all$lwppd_MPa< -10)] <- NA # put NAs in places that returned -Infs
 
 for (i in c(5:8)){
-  these <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
-  these <- as.vector(these)
-  those <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
-  include <- ifelse((i+1) %in% clean & those < 188,which(these > -1.75),c(1:length(these)))
-  include <- ifelse((i+1) %in% check & those < 188,which(these > -1.75),include)
-  include <- ifelse((i+1) %in% alsocheck & those < 189,which(these > -1.75),include) 
-  these <- these[include]
-  lwppd.all[c(k:(k+(ks-1))),3] <- these
-  lwppd.all[c(k:(k+(ks-1))),1] <- those
-  lwppd.all[c(k:(k+(ks-1))),2] <- rep(i+1,length(these))
+  max.wps <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
+  max.wps <- as.vector(max.wps)
+  sampling.doys <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
+  include <- ifelse((i+1) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
+  include <- ifelse((i+1) %in% check & sampling.doys < 188,which(max.wps > -1.75),include)
+  include <- ifelse((i+1) %in% alsocheck & sampling.doys < 189,which(max.wps > -1.75),include) 
+  max.wps <- max.wps[include]
+  lwppd.all[c(k:(k+(ks-1))),3] <- max.wps
+  lwppd.all[c(k:(k+(ks-1))),1] <- sampling.doys
+  lwppd.all[c(k:(k+(ks-1))),2] <- rep(i+1,length(max.wps))
   k <- k + ks
 }
 lwppd.all[which(lwppd.all[,3] > 0),3] <- NA
@@ -288,7 +343,8 @@ lwppd.all[which(lwppd.all[,3] == -Inf),3] <- NA
 ### add in a 'tag' column to match rest of dataset:
 tag <- c(590,592,589,498,10999,588,591,10954,600)
 ind <- c(1:9)
-tag.mapper <- data.frame(tag, ind)
+treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
+tag.mapper <- data.frame(tag, ind, treatment)
 
 ### turning DOY into a date that plays well with other datasets
 
