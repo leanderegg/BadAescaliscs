@@ -6,11 +6,6 @@
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 
 se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
-library(dplyr)
-library(reshape2)
-library(RColorBrewer)
-library(stringr)
-library(ggplot2)
 
 mypal <- brewer.pal(n=8, "Set2")
 palette(mypal)

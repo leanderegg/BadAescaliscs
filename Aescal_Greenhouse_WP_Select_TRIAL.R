@@ -1,9 +1,35 @@
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+#          STEP 1: LOAD AND CLEAN WP DATA
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
+
+
+
+
 #rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 require(tidyr)
 require(dplyr)
+require(stringr)
+library(dplyr)
+library(reshape2)
+library(RColorBrewer)
+library(stringr)
+library(ggplot2)
+
+
+
 se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
+
+
+#____________________________________________________________________________________________________________
+####### START: Loak raw psychrometer data, qc flag data, and calibrate to get raw wp data #######################
+
 wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
 head(wpdata)
 iteration.number <- 1:length(wpdata[,1])
@@ -200,6 +226,7 @@ complete.data.2[,12] <- (complete.data.2[,12]-calib[9,3])/calib[9,2]
 
 
 
+
 ####### Quick visualizing raw output ###########################3
 #raw predawn traces (for all psychrometers)
 par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
@@ -211,37 +238,47 @@ for (i in c(5:8)){
   plot(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i]~complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i+1])
 }
 
-#raw predawn traces (for all psychrometers) based on a single value
-par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
-cols <- c("black","red","blue","darkgreen","brown","turquoise","violet","darkorange","cornflowerblue")
-for (i in c(10:14)){
-  plot(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,i]~complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i-9])
-}
-for (i in c(9:12)){
-  plot(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i]~complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i-3])
-}
-head(complete.data)
+# #raw predawn traces (for all psychrometers) based on a single value (max of 3 points)
+# par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
+# cols <- c("black","red","blue","darkgreen","brown","turquoise","violet","darkorange","cornflowerblue")
+# for (i in c(10:14)){
+#   plot(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,i]~complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i-9])
+# }
+# for (i in c(9:12)){
+#   plot(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i]~complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i-3])
+# }
+# head(complete.data)
 
 
-#### Lee's new way of processing data ########
+
+####### END: load raw psychrometer data and quality flags #############
+
+
+
+#________________________________________________________________________
+#### START: Lee's new way of processing wp data to long form ########
+
+
 
 # step 1: take wide data and make it long
 # step 2: merge in quality control flags
 # step 3: aggregate things by date, filtering for bad values
 
+
 # take complete.data and make it long form (take 5 psy columns and make them 1 column)
 wpslong1 <- gather(select(.data = complete.data, Yr,DOY,Time,Temp,PSY1:PSY5) , key = "Psy_num", value="lwppd", PSY1:PSY5)
 
 # take qc1 and also make it long
-names(qc1)<- str_replace(names(qc1), pattern = ".qc","")
-qualcont1 <- data.frame(complete.data[,1:4], qc1[,-1])
-qclong1 <- gather(qualcont1,key = "Psy_num", value="QC_flag", PSY1:PSY5 )
+names(qc1)<- str_replace(names(qc1), pattern = ".qc","") # pull out the ".qc" part of the quality control data flag column names so they will match up with wpslong psychrometer names
+qualcont1 <- data.frame(complete.data[,1:4], qc1[,-1]) # tacking on date, time, temp info from complete.data and killig extra column named "X" that came in when we read.csv (was rownmanes)
+qclong1 <- gather(qualcont1,key = "Psy_num", value="QC_flag", PSY1:PSY5 ) # take wide form and make long
 
-#merge wps and qc flags
+#merge wps and qc flags for first 5 psychrometers
 wps1 <- full_join(wpslong1, qclong1)
 
 
 
+# repeat the above steps for psychrometers 6-9
 # take complete.data and make it long form (take 5 psy columns and make them 1 column)
 wpslong2 <- gather(select(.data = complete.data.2, Yr,DOY,Time,Temp,PSY6:PSY9) , key = "Psy_num", value="lwppd", PSY6:PSY9)
 
@@ -254,12 +291,21 @@ qclong2 <- gather(qualcont2,key = "Psy_num", value="QC_flag", PSY6:PSY9 )
 wps2 <- full_join(wpslong2, qclong2)
 
 
+# row bind psychrometers 1-5 and 6-9 together into one dataframe
 wps.all <- rbind(wps1, wps2)
 
+
+
+# now summarize all repeat measurments to get a mean per day. also filter out bad psychrmenter readings
 wps.clean <- wps.all %>% filter(QC_flag==TRUE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
 
+
+
+###### . Adding tag and treatment info ############
 # extract individuals for matching up with tags
 wps.clean$ind <- as.numeric(str_replace(wps.clean$Psy_num,"PSY", ""))
+
+
 
 ### add in a 'tag' column to match rest of dataset:
 tag <- c(590,592,589,498,10999,588,591,10954,600)
@@ -267,21 +313,49 @@ ind <- c(1:9)
 treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
 tag.mapper <- data.frame(tag, ind, treatment)
 
+# add final column to wp data with individuals tag name and treatment
 wps.clean$tag <- tag.mapper$tag[match(wps.clean$ind, tag.mapper$ind)]
 wps.clean$treatment <- tag.mapper$treatment[match(wps.clean$ind, tag.mapper$ind)]
 
 
 # convert DOY to dates so we can match
 wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")
-wps.clean$doy.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
+  # make a new column that R recognizes as a date
+wps.clean$DOY.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
 
 
 
-######## taking wide form data and making it long form (and combining psys 1-5 &6-9) ##########3
+###### END: average wps and turn long form ###################
+#____________________________________________________________________________
+
+
+
+
+####### ^^ RUN EVERYTHING ABOVE ^^ ######################
+
+
+
+
+
+
+
+
+
+#______________________________________________________________________________________
+
+################## Rob's way of cleaning and processing data ##########################
+
+# DONT RUN !!!!
+
+
+######## taking wide form data and making it long form (and combining psys 1-5 &6-9) ##########
+
 # make empty dataframe to put averaged values into
 lwppd.all <- matrix(NA,ncol=4,nrow=9*length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2])))
 lwppd.all <- as.data.frame(lwppd.all)
 colnames(lwppd.all) <- c("doy","ind","lwppd_MPa","treatment")
+
+
 
 #  # of days with predawns
 ks <- length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2]))
