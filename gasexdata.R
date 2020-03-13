@@ -1,16 +1,29 @@
 
 
-####### Load Data ##############
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+#          STEP 3: LOAD gasex data and combine lwp, aba, gs
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+####### START: Load Data ############################
 #rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 
-se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
+#se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 
+
+# set our color palette cause default be hella gnarly
 mypal <- brewer.pal(n=8, "Set2")
 palette(mypal)
 
+
+# load raw gas exchnage data
 gasexchange<-read.csv("gasexdata_AECA.csv", header = T)
+
+
+####. Add in date and individual Tag, and treatment info #######
 # 4th of july data doesn't have year
 gasexchange$Date <- as.character(gasexchange$Date)
 gasexchange$Date[which(gasexchange$Date=="4-Jul")] <- "4-Jul-18" # add a date into that shit
@@ -34,43 +47,78 @@ gasexchange$treatment[gasexchange$tag %in% severe] <- "severe"
 
 ####### Combine ABA and LWP data w/ gasex #############3
 
-## aba from ABA.R
+## aba from ABA.R (Step 2)
 
 # quick rename "999" and "954" to "10###"
 aba$tag[which(aba$tag == 999)] <- 10999
 aba$tag[which(aba$tag == 954)] <- 10954
 # aba$tag <- as.numeric(aba$tag) # make numeric to match gasexchange, which as a numeric 'tag' column
 gsaba <- left_join(gasexchange, aba, by=c("tag"="tag","Date"="date", "treatment"="treatment"))
-gsaba$lwp <- NULL
 gsaba$time.since.start <- NULL
 head(gsaba)
 
 
 
-## lwppd.all from Aescal_Greenhous_WP_Select.R
+
+
+## wps.clean from Aescal_Greenhous_WP_Select.R (Step 1)
 
 # with Rob's old janky ass dataframe
 # enchilada <- left_join(gsaba, lwppd.all %>% select(doy.yr, tag, lwppd_MPa), by = c("Date"="doy.yr","tag"="tag"))
+
+
 # with Lee's new hotness
-enchilada <- left_join(gsaba, wps.clean %>% select(doy.yr, tag, lwp.m), by = c("Date"="doy.yr","tag"="tag"))
+enchilada <- left_join(gsaba, wps.clean %>% select(DOY.yr, tag, lwp.m), by = c("Date"="DOY.yr","tag"="tag"))
+
 enchilada$treatment <- factor(enchilada$treatment)
+# and kill some useless columns that we'll add back in eventually
+enchilada$time.since.start <- NULL
+enchilada$yr <- NULL
+enchilada$DOY <- NULL
 # make a column to destinguish when things started getting rewatered (pch=16 -> watered pch=1 -> not watered)
-enchilada$watered <- 16
+#enchilada$watered <- 16
 
-####### Adding some derived metrics ############
+# make a day of year column
+enchilada$DOY <- as.numeric(strftime(enchilada$Date, format = "%j"))
+# subract out days since June 28th 
+enchilada$time.since.start <- as.numeric(enchilada$DOY) - 179
+# and make everything pre-drought ==0
+enchilada$time.since.start[which(enchilada$time.since.start<0)] <- 0
 
-# set a minimum water potential for each individual
-ench <- enchilada %>% group_by(ID, tag, treatment) %>% summarise(minlwp = min(lwp.m, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T))
+# make a time since rewatering column
+enchilada$time.since.rewater <- NA
+# cacluate rewatering for each tree seperately
+enchilada$time.since.rewater[which(enchilada$tag=="591")] <- enchilada$DOY[which(enchilada$tag=="591")] - 198
+enchilada$time.since.rewater[which(enchilada$tag=="10999")] <- enchilada$DOY[which(enchilada$tag=="10999")] - 200
+enchilada$time.since.rewater[which(enchilada$tag=="592")] <- enchilada$DOY[which(enchilada$tag=="592")] - 200
+enchilada$time.since.rewater[which(enchilada$tag=="600")] <- enchilada$DOY[which(enchilada$tag=="600")] - 200
+enchilada$time.since.rewater[which(enchilada$tag=="590")] <- enchilada$DOY[which(enchilada$tag=="590")] - 201
+enchilada$time.since.rewater[which(enchilada$tag=="588")] <- enchilada$DOY[which(enchilada$tag=="588")] - 202
+enchilada$time.since.rewater[which(enchilada$time.since.rewater<0)] <- 0
 
-ench$date.min <- as.Date(NA)
-for(i in unique(enchilada$tag)){
-  tmp <- enchilada[which(enchilada$tag==i),]
-  ench$date.min[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwp.m == min(tmp$lwp.m, na.rm=T))])
-}
 
-# add in to enchilada a column indicating min wp, and date of min so we can analyze recover
-enchilada$minlwp <- ench$minlwp[match(enchilada$tag, ench$tag)]
-enchilada$date.min <- ench$date.min[match(enchilada$tag, ench$tag)]
+
+
+
+
+# 
+# 
+# 
+# ####### Adding some derived metrics ############
+# 
+# # set a minimum water potential for each individual
+# ench <- enchilada %>% group_by(ID, tag, treatment) %>% summarise(minlwp = min(lwp.m, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T))
+# 
+# ench$date.min <- as.Date(NA)
+# for(i in unique(enchilada$tag)){
+#   tmp <- enchilada[which(enchilada$tag==i),]
+#   ench$date.min[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwp.m == min(tmp$lwp.m, na.rm=T))])
+# }
+# 
+# # add in to enchilada a column indicating min wp, and date of min so we can analyze recover
+# enchilada$minlwp <- ench$minlwp[match(enchilada$tag, ench$tag)]
+# enchilada$date.min <- ench$date.min[match(enchilada$tag, ench$tag)]
+
 
 #_________________________________________________________
 ####### Plot timecourses of Gs, LWP, and ABA #########
@@ -97,11 +145,27 @@ abline(v=as.Date("2018-06-28", "%F"))
 #quartz.save()
 
 
+
+
+
+
 # visualizing individual WPs in different panels
 par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
 for(i in unique(enchilada$tag)){
   plot(lwp.m~Date, enchilada[which(enchilada$tag==i & enchilada$lwp.m<0),], col=treatment, ylim=c(-6,0), xlim=as.Date(c("2018-04-27","2018-07-30")))
 }
+
+par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
+for(i in unique(enchilada$tag)){
+  plot(ABAFWngg~Date, enchilada[which(enchilada$tag==i),], col=treatment, ylim=c(-6,0), xlim=as.Date(c("2018-04-27","2018-07-30")))
+}
+
+
+ggplot(enchilada, aes(x=Date, y=ABAFWngg,col=treatment)) + geom_point() + facet_wrap(facets = ~tag)
+ggplot(enchilada, aes(x=Date, y=lwp.m,col=treatment)) + geom_point() + facet_wrap(facets = ~tag)
+
+
+
 ### Plotting scatterplots of GS, ABA and lwp
 ggplot(gsaba, aes(x=log(ABAFWngg), y=log(gs), col=treatment)) + geom_point() #+ geom_smooth(se=F,method = "loess",span=1)
 
@@ -116,6 +180,15 @@ ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log
 
 
 plot(lwp.m~ABAFWngg, enchilada, col=treatment)
+
+
+
+
+
+# ++++++++++++++++++++++++++++++++++++++++++
+######## average to treatment #########
+
+ench <- enchilada %>% group_by(Date, DOY, treatment) %>% summarise(E.m = mean(E, na.rm=T), gs.m=mean(gs,na.rm=T), lwp.m = mean(lwp.m, na.rm=T), ABA.m=mean(ABAFWngg, na.rm=T))
 
 
 

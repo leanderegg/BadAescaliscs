@@ -297,7 +297,7 @@ wps.all <- rbind(wps1, wps2)
 
 
 # now summarize all repeat measurments to get a mean per day. also filter out bad psychrmenter readings
-wps.clean <- wps.all %>% filter(QC_flag==TRUE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
+wps.clean <- wps.all %>% filter(QC_flag==TRUE | QC_flag==FALSE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
 
 
 

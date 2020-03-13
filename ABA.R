@@ -1,8 +1,17 @@
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+#          STEP 2: LOAD AND CLEAN ABBA DATA
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+
+
+
 # ABA data
 # Buckeye 2018
 
 #setwd("~/Documents/RESEARCH/California Buckeye")
-require(dplyr)
+# require(dplyr)
 
 aba <- read.table("ABA.csv", header=T, sep=",") %>% select(1:3)
 abadate.raw <- read.table("ABAdate.csv", header=T, sep=",")
@@ -23,9 +32,28 @@ aba$treatment[aba$tag %in% severe] <- "severe"
 aba$date <- abadate$Date[match(aba$time.since.start, abadate$Collection_num)]
 
 
+######### END: load ABA data #############################
 
 
 
+
+########## ^^ RUN EVERYTHING ABOVE #########################
+#____________________________________________________________
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## plotting time course of ABA for each individual #######
 cols <- c("purple","red","orange","saddlebrown","black","blue","green","cornflowerblue","pink","yellow")
 tag.i <- as.vector(unique(aba$tag))
 names(aba)
@@ -47,6 +75,12 @@ for (i in c(1:length(tag.i))){
 mtext(side=2,outer=T, line=2,expression(paste("ABA level (g ",g^-1,")")))
 mtext(side=1,outer=T, line=2,"Day of sampling")
 # dev.off()
+
+
+
+
+
+
 
 # treatment means
 aba.means <- tapply(aba$ABAFWngg,list(aba$treatment,aba$time),mean, na.rm=T)
