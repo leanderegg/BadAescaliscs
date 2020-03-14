@@ -30,13 +30,15 @@ se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 #____________________________________________________________________________________________________________
 ####### START: Loak raw psychrometer data, qc flag data, and calibrate to get raw wp data #######################
 
-wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
+#wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
+wpdata<-read.csv("GREENHOUSEWP.csv", header = FALSE)
 head(wpdata)
-iteration.number <- 1:length(wpdata[,1])
-iteration.number[1] <- 1
-for (i in c(2:length(iteration.number))){
-  iteration.number[i] <- ifelse(wpdata[i,1] == 106,iteration.number[i-1]+1,iteration.number[i-1])
-}
+# iteration.number <- 1:length(wpdata[,1])
+# iteration.number[1] <- 1
+# for (i in c(2:length(iteration.number))){
+#   iteration.number[i] <- ifelse(wpdata[i,1] == 106,iteration.number[i-1]+1,iteration.number[i-1])
+# }
+iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
 wpdata.n <- cbind(iteration.number,wpdata)
 numberofiterations <- max(iteration.number)/2
 
@@ -77,65 +79,74 @@ qc2 <- data.frame(matrix(NA, ncol=4, nrow=numberofiterations))
 names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 
 
-ninitial <- seq(from=1,to=max(iteration.number),by=1)
-nadd <- seq(from=0,to=max(iteration.number)-1,by=1)
-ncombine <- matrix(NA,ncol=3,nrow=max(iteration.number))
-ncombine <- as.data.frame(ncombine)
-ncombine[,1] <- ninitial
-ncombine[,2] <- nadd
-ncombine[,3] <- ncombine[,1] + ncombine[,2]
-
+# Rob being a crazy guy, getting the odd numbers...
+# ninitial <- seq(from=1,to=max(iteration.number),by=1)
+# nadd <- seq(from=0,to=max(iteration.number)-1,by=1)
+# ncombine <- matrix(NA,ncol=3,nrow=max(iteration.number))
+# ncombine <- as.data.frame(ncombine)
+# ncombine[,1] <- ninitial
+# ncombine[,2] <- nadd
+# ncombine[,3] <- ncombine[,1] + ncombine[,2]
+# these <- which(ncombine[,3] < max(iteration.number))
 
 
 # run through, pull out each psy measurement, and average values from the peaks
 QC <- F # T/F -run quality control script?
 qc.ver <- "20180310" #quality control version
 
-these <- which(ncombine[,3] < max(iteration.number))
+
+these <- seq(from=1, to=max(iteration.number)-1, by=2)
 those <- seq(from=2,to=max(iteration.number),by=2)
 psy <- 1:5
 psy.one <- 1:5
 qc.flag <- rep("fail", times=5)
+
+
+# loop through each odd measurement (psys 1-5, discard those not between 4-5am, and then summarize/qc into df)
 l <- 0
-for (i in c(ncombine[these,3])){
-  l <- l + 1
+for (i in these){
+  
   yr <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),3] #pulling out yr from header row indicated by 106
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4] # pulling out doy from header rows
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5] # pulling out time stamp from header rows (in hhmm format)
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6] # pulling out ambient Temp from header row
-  j <- 0
-  for (k in c(109,111,113,115,117)){
-    j <- j + 1
-    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]
-    all <- as.numeric(all)
-    psy[j] <- mean(all,na.rm=T)
-    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6)]
-    all <- as.numeric(all)
-    psy.one[j] <- mean(all,na.rm=T)
-    if(QC==T){
-      if(is.na(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5)])){
-        qc.flag[j] <- NA 
+  if(time<500 & time >400){
+    l <- l + 1
+    j <- 0
+    for (k in c(109,111,113,115,117)){
+      j <- j + 1
+      all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]
+      all <- as.numeric(all)
+      psy[j] <- mean(all,na.rm=T)
+      all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6)]
+      all <- as.numeric(all)
+      psy.one[j] <- mean(all,na.rm=T)
+      if(QC==T){
+        if(is.na(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5)])){
+          qc.flag[j] <- NA 
+        }
+        else{
+          plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
+          points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
+          print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
+          #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
+          qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
+        }
+        
       }
-      else{
-        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
-        points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
-        print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
-        qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
-      }
-      
     }
-  }
-  complete.data[l,1] <- yr
-  complete.data[l,2] <- doy
-  complete.data[l,3] <- time
-  complete.data[l,4] <- temp
-  complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
-  complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
-  if(QC==T){
-    qc1[l, c(1:5)] <- qc.flag 
+    complete.data[l,1] <- yr
+    complete.data[l,2] <- doy
+    complete.data[l,3] <- time
+    complete.data[l,4] <- temp
+    complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
+    complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
+    if(QC==T){
+      qc1[l, c(1:5)] <- qc.flag 
+    }
+    
   }
 }
-
 # write qc output so you don't have to rerun:
 # write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
 # only run if QC ==T and you made a new qc file
@@ -152,11 +163,13 @@ psy.one <- 1:4
 # start right before you failed:
 #l <- 
 for (i in c(those)){
-  l <- l + 1
+
   yr <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),3]
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4]
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5]
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6]
+  if(time<500 & time >400){
+  l <- l + 1
   j <- 0
   qc.flag <- rep("fail", times=4)
   for (k in c(109,111,113,115)){
