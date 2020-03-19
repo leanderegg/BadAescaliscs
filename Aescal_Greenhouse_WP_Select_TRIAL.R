@@ -30,17 +30,43 @@ se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 #____________________________________________________________________________________________________________
 ####### START: Loak raw psychrometer data, qc flag data, and calibrate to get raw wp data #######################
 
-#wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
-wpdata<-read.csv("GREENHOUSEWP.csv", header = FALSE)
-head(wpdata)
-# iteration.number <- 1:length(wpdata[,1])
-# iteration.number[1] <- 1
-# for (i in c(2:length(iteration.number))){
-#   iteration.number[i] <- ifelse(wpdata[i,1] == 106,iteration.number[i-1]+1,iteration.number[i-1])
-# }
+
+# # with hand cleaned data
+# wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
+# iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
+# wpdata.n <- cbind(iteration.number,wpdata)
+# numberofiterations <- max(iteration.number)/2
+# 
+# #--------------------------
+
+
+
+
+# with full dataset
+wpdata.raw<-read.csv("GREENHOUSEWPmanual.csv", header = FALSE)[,-c(14:20)]
+head(wpdata.raw)
+
+
+iteration.number <- rep(c(1:(nrow(wpdata.raw)/6)), each=6)
+wpdata.raw.n <- cbind(iteration.number,wpdata.raw)
+numberofiterations <- max(iteration.number)/2
+
+wpdata <- data.frame()
+### try prescreening times:
+for(i in 1:max(iteration.number)){
+  tmp <- wpdata.raw.n[which(wpdata.raw.n[,1]==i),]
+  if(tmp[1,5]>400 & tmp[1,5]<500){
+    wpdata <- rbind(wpdata, tmp)
+  }
+}
+
+
 iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
 wpdata.n <- cbind(iteration.number,wpdata)
 numberofiterations <- max(iteration.number)/2
+
+
+
 
 complete.data <- matrix(NA, ncol=14, nrow=numberofiterations)
 complete.data <- as.data.frame(complete.data)
@@ -105,48 +131,46 @@ qc.flag <- rep("fail", times=5)
 # loop through each odd measurement (psys 1-5, discard those not between 4-5am, and then summarize/qc into df)
 l <- 0
 for (i in these){
-  
+  l <- l + 1
   yr <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),3] #pulling out yr from header row indicated by 106
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4] # pulling out doy from header rows
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5] # pulling out time stamp from header rows (in hhmm format)
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6] # pulling out ambient Temp from header row
-  if(time<500 & time >400){
-    l <- l + 1
-    j <- 0
-    for (k in c(109,111,113,115,117)){
-      j <- j + 1
-      all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]
-      all <- as.numeric(all)
-      psy[j] <- mean(all,na.rm=T)
-      all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6)]
-      all <- as.numeric(all)
-      psy.one[j] <- mean(all,na.rm=T)
-      if(QC==T){
-        if(is.na(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5)])){
-          qc.flag[j] <- NA 
-        }
-        else{
-          plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
-          points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
-          print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
-          #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
-          qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
-        }
-        
-      }
-    }
-    complete.data[l,1] <- yr
-    complete.data[l,2] <- doy
-    complete.data[l,3] <- time
-    complete.data[l,4] <- temp
-    complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
-    complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
+  j <- 0
+  for (k in c(109,111,113,115,117)){
+    j <- j + 1
+    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]
+    all <- as.numeric(all)
+    psy[j] <- mean(all,na.rm=T)
+    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6)]
+    all <- as.numeric(all)
+    psy.one[j] <- mean(all,na.rm=T)
     if(QC==T){
-      qc1[l, c(1:5)] <- qc.flag 
+      if(is.na(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5)])){
+        qc.flag[j] <- NA 
+      }
+      else{
+        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
+        points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
+        print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
+        #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
+        qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
+      }
+      
     }
-    
   }
+  complete.data[l,1] <- yr
+  complete.data[l,2] <- doy
+  complete.data[l,3] <- time
+  complete.data[l,4] <- temp
+  complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
+  complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
+  if(QC==T){
+    qc1[l, c(1:5)] <- qc.flag 
+  }
+  
 }
+
 # write qc output so you don't have to rerun:
 # write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
 # only run if QC ==T and you made a new qc file
