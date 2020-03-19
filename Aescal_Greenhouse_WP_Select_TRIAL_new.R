@@ -31,43 +31,11 @@ se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 ####### START: Loak raw psychrometer data, qc flag data, and calibrate to get raw wp data #######################
 
 
-<<<<<<< HEAD
-# # with hand cleaned data
-# wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
-# iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
-# wpdata.n <- cbind(iteration.number,wpdata)
-# numberofiterations <- max(iteration.number)/2
-# 
-# #--------------------------
-
-
-
-
-# with full dataset
-wpdata.raw<-read.csv("GREENHOUSEWPmanual.csv", header = FALSE)[,-c(14:20)]
-head(wpdata.raw)
-
-
-iteration.number <- rep(c(1:(nrow(wpdata.raw)/6)), each=6)
-wpdata.raw.n <- cbind(iteration.number,wpdata.raw)
-numberofiterations <- max(iteration.number)/2
-
-wpdata <- data.frame()
-### try prescreening times:
-for(i in 1:max(iteration.number)){
-  tmp <- wpdata.raw.n[which(wpdata.raw.n[,1]==i),]
-  if(tmp[1,5]>400 & tmp[1,5]<500){
-    wpdata <- rbind(wpdata, tmp)
-  }
-}
-
-
-=======
 ## full, uncleaned dataset ####
 wpdata.raw<-read.csv("GREENHOUSEWPmanual.csv", header = FALSE)
 
-# tack on an iteration number to pull out rows of six
-iteration.number <- rep(c(1:(nrow(wpdata.raw)/6)), each=6)
+# tack on an iteration number to pull out rows of 12 (psy1-5 and then 6-9)
+iteration.number <- rep(c(1:(nrow(wpdata.raw)/12)), each=12)
 wpdata.raw.n <- cbind(iteration.number,wpdata.raw)
 
 # pull out the iteration number of all measurements that happen predawn
@@ -87,13 +55,9 @@ head(wpdata)
 # for (i in c(2:length(iteration.number))){
 #   iteration.number[i] <- ifelse(wpdata[i,1] == 106,iteration.number[i-1]+1,iteration.number[i-1])
 # }
->>>>>>> 36406a0d05ec724a6d1f272ff24848829cee52de
 iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
 wpdata.n <- cbind(iteration.number,wpdata)
 numberofiterations <- max(iteration.number)/2
-
-
-
 
 complete.data <- matrix(NA, ncol=14, nrow=numberofiterations)
 complete.data <- as.data.frame(complete.data)
@@ -145,7 +109,7 @@ names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 
 # run through, pull out each psy measurement, and average values from the peaks
 QC <- F # T/F -run quality control script?
-qc.ver <- "20180310" #quality control version
+qc.ver <- "20200315" #quality control version
 
 
 these <- seq(from=1, to=max(iteration.number)-1, by=2)
@@ -158,22 +122,11 @@ qc.flag <- rep("fail", times=5)
 # loop through each odd measurement (psys 1-5, discard those not between 4-5am, and then summarize/qc into df)
 l <- 0
 for (i in these){
-  l <- l + 1
+  
   yr <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),3] #pulling out yr from header row indicated by 106
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4] # pulling out doy from header rows
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5] # pulling out time stamp from header rows (in hhmm format)
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6] # pulling out ambient Temp from header row
-<<<<<<< HEAD
-  j <- 0
-  for (k in c(109,111,113,115,117)){
-    j <- j + 1
-    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]
-    all <- as.numeric(all)
-    psy[j] <- mean(all,na.rm=T)
-    all <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6)]
-    all <- as.numeric(all)
-    psy.one[j] <- mean(all,na.rm=T)
-=======
   #if(time<500 & time >400){
     l <- l + 1
     j <- 0
@@ -205,43 +158,22 @@ for (i in these){
     complete.data[l,4] <- temp
     complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
     complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
->>>>>>> 36406a0d05ec724a6d1f272ff24848829cee52de
     if(QC==T){
-      if(is.na(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5)])){
-        qc.flag[j] <- NA 
-      }
-      else{
-        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
-        points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
-        print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
-        #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
-        qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
-      }
-      
+      qc1[l, c(1:5)] <- qc.flag 
     }
-<<<<<<< HEAD
-  }
-  complete.data[l,1] <- yr
-  complete.data[l,2] <- doy
-  complete.data[l,3] <- time
-  complete.data[l,4] <- temp
-  complete.data[l,c(5:9)] <- psy #store average of 3 value plateau
-  complete.data[l,c(10:14)] <- psy.one # store value of first point of plateau (third measurement)
-  if(QC==T){
-    qc1[l, c(1:5)] <- qc.flag 
-  }
-  
-=======
     
 #  }
->>>>>>> 36406a0d05ec724a6d1f272ff24848829cee52de
 }
+# _____________
+## Uncomment to write new QC file ########
+ write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
+#_______________
 
-# write qc output so you don't have to rerun:
-# write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
-# only run if QC ==T and you made a new qc file
+# v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
+# v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
-# qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
+## load in newest version of qc1
+ qc1 <- read.csv("Psychrometer_QC1_20200315.csv")
 
 
 ### repeat for psychrometers 5-9
@@ -297,11 +229,14 @@ for (i in c(those)){
 
 # _____________
 ## Uncomment to write new QC file ########
-# write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv"))
+ write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv"))
 #_______________
 
-# v1 for 
-qc2 <- read.csv("Psychrometer_QC2_20180309.csv")
+# v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
+# v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
+
+## read in newest version of qc2
+qc2 <- read.csv("Psychrometer_QC2_2020315.csv")
 
 
 complete.data[,c(5:9)] <- complete.data[,c(5:9)]/(0.325+0.027*complete.data[,4]) 
