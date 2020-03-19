@@ -30,9 +30,26 @@ se <- function(x,na.rm=T) sqrt(var(x))/sum(!is.na(x))
 #____________________________________________________________________________________________________________
 ####### START: Loak raw psychrometer data, qc flag data, and calibrate to get raw wp data #######################
 
+
+## full, uncleaned dataset ####
+wpdata.raw<-read.csv("GREENHOUSEWPmanual.csv", header = FALSE)
+
+# tack on an iteration number to pull out rows of six
+iteration.number <- rep(c(1:(nrow(wpdata.raw)/6)), each=6)
+wpdata.raw.n <- cbind(iteration.number,wpdata.raw)
+
+# pull out the iteration number of all measurements that happen predawn
+predawns <- wpdata.raw.n[which(wpdata.raw.n[,5]>=400 & wpdata.raw.n[,5]<= 500),1]
+
+# pull out the appropriate measurements
+wpdata.pd <- wpdata.raw.n[which(wpdata.raw.n[,1] %in% predawns),]
+wpdata <- wpdata.pd %>% select(V1:V13)
+
+
+# old manually cleaned dataset
 #wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
-wpdata<-read.csv("GREENHOUSEWP.csv", header = FALSE)
 head(wpdata)
+
 # iteration.number <- 1:length(wpdata[,1])
 # iteration.number[1] <- 1
 # for (i in c(2:length(iteration.number))){
@@ -110,7 +127,7 @@ for (i in these){
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4] # pulling out doy from header rows
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5] # pulling out time stamp from header rows (in hhmm format)
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6] # pulling out ambient Temp from header row
-  if(time<500 & time >400){
+  #if(time<500 & time >400){
     l <- l + 1
     j <- 0
     for (k in c(109,111,113,115,117)){
@@ -145,13 +162,13 @@ for (i in these){
       qc1[l, c(1:5)] <- qc.flag 
     }
     
-  }
+#  }
 }
 # write qc output so you don't have to rerun:
 # write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
 # only run if QC ==T and you made a new qc file
 
-qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
+# qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
 
 
 ### repeat for psychrometers 5-9
@@ -168,7 +185,7 @@ for (i in c(those)){
   doy <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),4]
   time <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),5]
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6]
-  if(time<500 & time >400){
+  #if(time<500 & time >400){
   l <- l + 1
   j <- 0
   qc.flag <- rep("fail", times=4)
@@ -205,7 +222,12 @@ for (i in c(those)){
   }
 }
 
+# _____________
+## Uncomment to write new QC file ########
 # write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv"))
+#_______________
+
+# v1 for 
 qc2 <- read.csv("Psychrometer_QC2_20180309.csv")
 
 
