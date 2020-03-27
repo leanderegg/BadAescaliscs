@@ -10,7 +10,7 @@
 
 
 
-#rm(list=ls())
+rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 require(tidyr)
