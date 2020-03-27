@@ -108,8 +108,8 @@ names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 
 
 # run through, pull out each psy measurement, and average values from the peaks
-QC <- F # T/F -run quality control script?
-qc.ver <- "20200315" #quality control version
+QC <- T # T/F -run quality control script?
+qc.ver <- "20200319" #quality control version
 
 
 these <- seq(from=1, to=max(iteration.number)-1, by=2)
@@ -166,17 +166,17 @@ for (i in these){
 }
 # _____________
 ## Uncomment to write new QC file ########
- write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv"))
+ #write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv")) #when doing quality control again, uncomment this, then update date of QC1_ file (seen in line 176)
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
 ## load in newest version of qc1
- qc1 <- read.csv("Psychrometer_QC1_20200315.csv")
+qc1 <- read.csv("Psychrometer_QC1_20200319.csv")
 
 
-### repeat for psychrometers 5-9
+### repeat for psychrometers 6-9
 l <- 0
 psy <- 1:4
 psy.one <- 1:4
@@ -210,7 +210,8 @@ for (i in c(those)){
         plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
         points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
         print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
-        qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
+        #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
+        qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
       }
       
     }
@@ -229,14 +230,14 @@ for (i in c(those)){
 
 # _____________
 ## Uncomment to write new QC file ########
- write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv"))
+ write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
 ## read in newest version of qc2
-qc2 <- read.csv("Psychrometer_QC2_2020315.csv")
+qc2 <- read.csv("Psychrometer_QC2_20200319.csv")
 
 
 complete.data[,c(5:9)] <- complete.data[,c(5:9)]/(0.325+0.027*complete.data[,4]) 
