@@ -3,14 +3,20 @@
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
+### UPDATE VERSION IF REPROCESSING QC #######
+
+# run through, pull out each psy measurement, and average values from the peaks
+QC <- F # T/F -run quality control script?
+# qc.ver <- "20200327" #last version, didn't actually work so still using original manual QC
+qc.ver <- "202004XX" #quality control version
+
+# clear Environment?
+# rm(list=ls())
 
 
 
 
 
-
-
-rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 require(tidyr)
@@ -106,10 +112,6 @@ names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 # ncombine[,3] <- ncombine[,1] + ncombine[,2]
 # these <- which(ncombine[,3] < max(iteration.number))
 
-
-# run through, pull out each psy measurement, and average values from the peaks
-QC <- F # T/F -run quality control script?
-qc.ver <- "20200327" #quality control version
 
 
 these <- seq(from=1, to=max(iteration.number)-1, by=2)
@@ -370,8 +372,10 @@ wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")
   # make a new column that R recognizes as a date
 wps.clean$DOY.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
 
-
-
+### writing out the current output so that don't have to run this code every time to work with gasexdata.R
+if(QC==T){
+write.csv(wps.clean, paste0("WP_data_processed", qc.ver, ".csv")
+}
 ###### END: average wps and turn long form ###################
 #____________________________________________________________________________
 
@@ -388,146 +392,148 @@ wps.clean$DOY.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
 
 
 
-#______________________________________________________________________________________
-
-################## Rob's way of cleaning and processing data ##########################
-
-# DONT RUN !!!!
 
 
-######## taking wide form data and making it long form (and combining psys 1-5 &6-9) ##########
-
-# make empty dataframe to put averaged values into
-lwppd.all <- matrix(NA,ncol=4,nrow=9*length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2])))
-lwppd.all <- as.data.frame(lwppd.all)
-colnames(lwppd.all) <- c("doy","ind","lwppd_MPa","treatment")
-
-
-
-#  # of days with predawns
-ks <- length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2]))
-
-k <- 1
-clean <- c(1,3,5,7,9)
-check <- c(6)
-alsocheck <- c(8)
-# loop through psychrometer columns, and pull out the max wp
-for (i in c(5:9)){
-  # take the max lwp from each day of measurments for a single psychrometer
-  max.wps <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,i],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T) # any time we have no good readings for a day, returns -Inf
-  max.wps <- as.vector(max.wps)
-  # pull out day of year for each measurement
-  sampling.doys <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T)
-  
-  # excluding wps more negative than -1.75 in pre-treatment period
-  include <- ifelse((i-4) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
-    # if psychrometer is 1,
-  max.wps <- max.wps[include]
-  lwppd.all[c(k:c(k+(ks-1))),3] <- max.wps
-  lwppd.all[c(k:(k+ (ks-1))),1] <- sampling.doys
-  lwppd.all[c(k:(k + (ks-1))),2] <- rep(i-4,length(max.wps))
-  k <- k + ks
-}
-lwppd.all[which(lwppd.all[,3] > 0),3] <- NA # get rid of bad wp that are positive
-lwppd.all$lwppd_MPa[which(lwppd.all$lwppd_MPa< -10)] <- NA # put NAs in places that returned -Infs
-
-for (i in c(5:8)){
-  max.wps <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
-  max.wps <- as.vector(max.wps)
-  sampling.doys <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
-  include <- ifelse((i+1) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
-  include <- ifelse((i+1) %in% check & sampling.doys < 188,which(max.wps > -1.75),include)
-  include <- ifelse((i+1) %in% alsocheck & sampling.doys < 189,which(max.wps > -1.75),include) 
-  max.wps <- max.wps[include]
-  lwppd.all[c(k:(k+(ks-1))),3] <- max.wps
-  lwppd.all[c(k:(k+(ks-1))),1] <- sampling.doys
-  lwppd.all[c(k:(k+(ks-1))),2] <- rep(i+1,length(max.wps))
-  k <- k + ks
-}
-lwppd.all[which(lwppd.all[,3] > 0),3] <- NA
-
-
-# group by treatment
-treats <- c("control","mwd","swd")
-control <- c(3,4,8)
-mwd <- c(2,5,9)
-swd <- c(1,6,7)
-for (i in c(1:length(lwppd.all$ind))){
-  lwppd.all[i,4] <- ifelse(lwppd.all[i,2] %in% control,"control",
-                           ifelse(lwppd.all[i,2] %in% mwd, "mwd","swd"))
-}
-lwppd.all[which(lwppd.all[,3] == -Inf),3] <- NA
-
-
-
-
-### add in a 'tag' column to match rest of dataset:
-tag <- c(590,592,589,498,10999,588,591,10954,600)
-ind <- c(1:9)
-treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
-tag.mapper <- data.frame(tag, ind, treatment)
-
-### turning DOY into a date that plays well with other datasets
-
-lwppd.all$tag <- tag.mapper$tag[match(lwppd.all$ind, tag.mapper$ind)]
-lwppd.all$doy.yr <- paste(lwppd.all$doy, "18", sep="-")
-lwppd.all$doy.yr <- as.Date(lwppd.all$doy.yr, "%j-%y")
-
-
-#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-######## Avveraging to treatment #############
-mean.data <- tapply(lwppd.all[,3],list(lwppd.all[,1],lwppd.all[,4]),mean,na.rm=T)
-mean.data.se <- tapply(lwppd.all[,3],list(lwppd.all[,1],lwppd.all[,4]),se)
-
-
-# plotting...some shit?
-
-par(mfrow=c(3,3))
-for (i in c(1:9)){
-  plot(lwppd.all[lwppd.all$ind == i,3]~lwppd.all[lwppd.all$ind == i,1], ylim=c(-5,0),yaxt="n",xaxt="n",type="l")
-  axis(side=1,tick=T,labels=F)
-  axis(side=2,tick=T,labels=F)
-}
-
-# plotting different shit
-pchs <- c(16,15,1)
-cols <- c("deepskyblue4","darkgoldenrod3","red")
-par(new=F,mfrow=c(1,1),oma=c(4,3,0.1,0.1),mar=c(3,1,0.1,0.1))
-doys <- as.numeric(rownames(mean.data))
-for (i in c(1:3)){
-  plot(mean.data[,i]~doys,ylim=c(-5,0),las=1, pch=pchs[i],col=cols[i],xlab="",ylab="",xlim=c(167,208),xaxt="n")
-  lines(mean.data[,i]~doys,ylim=c(-5,0),las=1,col=cols[i],xlab="",ylab="",xaxt="n")
-  arrows(doys,mean.data[,i]+mean.data.se[,i],doys,mean.data[,i]-mean.data.se[,i],code=3,length=0.01, col=cols[i],angle=90)
-  par(new=T)
-}
-addTrans <- function(color,trans)
-{
-  # This function adds transparancy to a color.
-  # Define transparancy with an integer between 0 and 255
-  # 0 being fully transparant and 255 being fully visable
-  # Works with either color and trans a vector of equal length,
-  # or one of the two of length 1.
-  
-  if (length(color)!=length(trans)&!any(c(length(color),length(trans))==1)) stop("Vector lengths not correct")
-  if (length(color)==1 & length(trans)>1) color <- rep(color,length(trans))
-  if (length(trans)==1 & length(color)>1) trans <- rep(trans,length(color))
-  
-  num2hex <- function(x)
-  {
-    hex <- unlist(strsplit("0123456789ABCDEF",split=""))
-    return(paste(hex[(x-x%%16)/16+1],hex[x%%16+1],sep=""))
-  }
-  rgb <- rbind(col2rgb(color),trans)
-  res <- paste("#",apply(apply(rgb,2,num2hex),2,paste,collapse=""),sep="")
-  return(res)
-}
-rect(198,-6,202,1,col=addTrans("cornflowerblue",80),border = NA)
-doydate <- read.csv("doydate.csv",header=T)
-lab.dates <- seq(from=168,to=208,by=3)
-these <- match(lab.dates,doydate[,1])
-axis(side=1,labels=doydate[these,2], at=lab.dates,tick=T,las=2)
-abline(v=178.5,lty=2,lwd=3,col="black")
-legend(169,-3,pch=pchs,col=cols,c("Control","MWD","SWD"))
-mtext(side=2,outer=T,"Predawn LWP (MPa)",line=1.5,at=0.55)
-mtext(side=1,outer=T,"Date",line=2.5,at=0.5)
-
+# #______________________________________________________________________________________
+# 
+# ################## Rob's way of cleaning and processing data ##########################
+# 
+# # DONT RUN !!!!
+# # Commented everything out (LDLA) on 4/6/2020
+# 
+# ######## taking wide form data and making it long form (and combining psys 1-5 &6-9) ##########
+# 
+# # make empty dataframe to put averaged values into
+# lwppd.all <- matrix(NA,ncol=4,nrow=9*length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2])))
+# lwppd.all <- as.data.frame(lwppd.all)
+# colnames(lwppd.all) <- c("doy","ind","lwppd_MPa","treatment")
+# 
+# 
+# 
+# #  # of days with predawns
+# ks <- length(unique(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2]))
+# 
+# k <- 1
+# clean <- c(1,3,5,7,9)
+# check <- c(6)
+# alsocheck <- c(8)
+# # loop through psychrometer columns, and pull out the max wp
+# for (i in c(5:9)){
+#   # take the max lwp from each day of measurments for a single psychrometer
+#   max.wps <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,i],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T) # any time we have no good readings for a day, returns -Inf
+#   max.wps <- as.vector(max.wps)
+#   # pull out day of year for each measurement
+#   sampling.doys <- tapply(complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],complete.data[complete.data$Time < 500 & complete.data$Time > 400,2],max,na.rm=T)
+#   
+#   # excluding wps more negative than -1.75 in pre-treatment period
+#   include <- ifelse((i-4) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
+#     # if psychrometer is 1,
+#   max.wps <- max.wps[include]
+#   lwppd.all[c(k:c(k+(ks-1))),3] <- max.wps
+#   lwppd.all[c(k:(k+ (ks-1))),1] <- sampling.doys
+#   lwppd.all[c(k:(k + (ks-1))),2] <- rep(i-4,length(max.wps))
+#   k <- k + ks
+# }
+# lwppd.all[which(lwppd.all[,3] > 0),3] <- NA # get rid of bad wp that are positive
+# lwppd.all$lwppd_MPa[which(lwppd.all$lwppd_MPa< -10)] <- NA # put NAs in places that returned -Infs
+# 
+# for (i in c(5:8)){
+#   max.wps <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
+#   max.wps <- as.vector(max.wps)
+#   sampling.doys <- tapply(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],mean,na.rm=T)
+#   include <- ifelse((i+1) %in% clean & sampling.doys < 188,which(max.wps > -1.75),c(1:length(max.wps)))
+#   include <- ifelse((i+1) %in% check & sampling.doys < 188,which(max.wps > -1.75),include)
+#   include <- ifelse((i+1) %in% alsocheck & sampling.doys < 189,which(max.wps > -1.75),include) 
+#   max.wps <- max.wps[include]
+#   lwppd.all[c(k:(k+(ks-1))),3] <- max.wps
+#   lwppd.all[c(k:(k+(ks-1))),1] <- sampling.doys
+#   lwppd.all[c(k:(k+(ks-1))),2] <- rep(i+1,length(max.wps))
+#   k <- k + ks
+# }
+# lwppd.all[which(lwppd.all[,3] > 0),3] <- NA
+# 
+# 
+# # group by treatment
+# treats <- c("control","mwd","swd")
+# control <- c(3,4,8)
+# mwd <- c(2,5,9)
+# swd <- c(1,6,7)
+# for (i in c(1:length(lwppd.all$ind))){
+#   lwppd.all[i,4] <- ifelse(lwppd.all[i,2] %in% control,"control",
+#                            ifelse(lwppd.all[i,2] %in% mwd, "mwd","swd"))
+# }
+# lwppd.all[which(lwppd.all[,3] == -Inf),3] <- NA
+# 
+# 
+# 
+# 
+# ### add in a 'tag' column to match rest of dataset:
+# tag <- c(590,592,589,498,10999,588,591,10954,600)
+# ind <- c(1:9)
+# treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
+# tag.mapper <- data.frame(tag, ind, treatment)
+# 
+# ### turning DOY into a date that plays well with other datasets
+# 
+# lwppd.all$tag <- tag.mapper$tag[match(lwppd.all$ind, tag.mapper$ind)]
+# lwppd.all$doy.yr <- paste(lwppd.all$doy, "18", sep="-")
+# lwppd.all$doy.yr <- as.Date(lwppd.all$doy.yr, "%j-%y")
+# 
+# 
+# #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+# ######## Avveraging to treatment #############
+# mean.data <- tapply(lwppd.all[,3],list(lwppd.all[,1],lwppd.all[,4]),mean,na.rm=T)
+# mean.data.se <- tapply(lwppd.all[,3],list(lwppd.all[,1],lwppd.all[,4]),se)
+# 
+# 
+# # plotting...some shit?
+# 
+# par(mfrow=c(3,3))
+# for (i in c(1:9)){
+#   plot(lwppd.all[lwppd.all$ind == i,3]~lwppd.all[lwppd.all$ind == i,1], ylim=c(-5,0),yaxt="n",xaxt="n",type="l")
+#   axis(side=1,tick=T,labels=F)
+#   axis(side=2,tick=T,labels=F)
+# }
+# 
+# # plotting different shit
+# pchs <- c(16,15,1)
+# cols <- c("deepskyblue4","darkgoldenrod3","red")
+# par(new=F,mfrow=c(1,1),oma=c(4,3,0.1,0.1),mar=c(3,1,0.1,0.1))
+# doys <- as.numeric(rownames(mean.data))
+# for (i in c(1:3)){
+#   plot(mean.data[,i]~doys,ylim=c(-5,0),las=1, pch=pchs[i],col=cols[i],xlab="",ylab="",xlim=c(167,208),xaxt="n")
+#   lines(mean.data[,i]~doys,ylim=c(-5,0),las=1,col=cols[i],xlab="",ylab="",xaxt="n")
+#   arrows(doys,mean.data[,i]+mean.data.se[,i],doys,mean.data[,i]-mean.data.se[,i],code=3,length=0.01, col=cols[i],angle=90)
+#   par(new=T)
+# }
+# addTrans <- function(color,trans)
+# {
+#   # This function adds transparancy to a color.
+#   # Define transparancy with an integer between 0 and 255
+#   # 0 being fully transparant and 255 being fully visable
+#   # Works with either color and trans a vector of equal length,
+#   # or one of the two of length 1.
+#   
+#   if (length(color)!=length(trans)&!any(c(length(color),length(trans))==1)) stop("Vector lengths not correct")
+#   if (length(color)==1 & length(trans)>1) color <- rep(color,length(trans))
+#   if (length(trans)==1 & length(color)>1) trans <- rep(trans,length(color))
+#   
+#   num2hex <- function(x)
+#   {
+#     hex <- unlist(strsplit("0123456789ABCDEF",split=""))
+#     return(paste(hex[(x-x%%16)/16+1],hex[x%%16+1],sep=""))
+#   }
+#   rgb <- rbind(col2rgb(color),trans)
+#   res <- paste("#",apply(apply(rgb,2,num2hex),2,paste,collapse=""),sep="")
+#   return(res)
+# }
+# rect(198,-6,202,1,col=addTrans("cornflowerblue",80),border = NA)
+# doydate <- read.csv("doydate.csv",header=T)
+# lab.dates <- seq(from=168,to=208,by=3)
+# these <- match(lab.dates,doydate[,1])
+# axis(side=1,labels=doydate[these,2], at=lab.dates,tick=T,las=2)
+# abline(v=178.5,lty=2,lwd=3,col="black")
+# legend(169,-3,pch=pchs,col=cols,c("Control","MWD","SWD"))
+# mtext(side=2,outer=T,"Predawn LWP (MPa)",line=1.5,at=0.55)
+# mtext(side=1,outer=T,"Date",line=2.5,at=0.5)
+# 

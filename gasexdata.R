@@ -4,7 +4,14 @@
 #          STEP 3: LOAD gasex data and combine lwp, aba, gs
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
+require(tidyr)
+require(dplyr)
+require(stringr)
+library(dplyr)
+library(reshape2)
+library(RColorBrewer)
+library(stringr)
+library(ggplot2)
 
 ####### START: Load Data ############################
 #rm(list=ls())
@@ -67,7 +74,13 @@ head(gsaba)
 # enchilada <- left_join(gsaba, lwppd.all %>% select(doy.yr, tag, lwppd_MPa), by = c("Date"="doy.yr","tag"="tag"))
 
 
-# with Lee's new hotness
+# with Lee's new method
+# load in most recent version of wps.clean so don't have to run WP_Select code
+wps.clean <- read.csv("WP_data_processed20200327.csv")[,-1]
+wps.clean$DOY.yr <- as.Date(wps.clean$DOY.yr) # make sure DOY.yr is in Date format
+
+
+# merge gs & ABA data with wp data
 enchilada <- left_join(gsaba, wps.clean %>% select(DOY.yr, tag, lwp.m), by = c("Date"="DOY.yr","tag"="tag"))
 
 enchilada$treatment <- factor(enchilada$treatment)
@@ -185,8 +198,8 @@ ggplot(gsaba[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), c
 quartz(width=5, height=6)
 ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
-quartz(width=5, height=6)
-ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
+#quartz(width=5, height=6)
+#ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
 
 quartz(width=5, height=6)
