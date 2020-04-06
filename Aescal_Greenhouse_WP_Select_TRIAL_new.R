@@ -118,11 +118,12 @@ these <- seq(from=1, to=max(iteration.number)-1, by=2)
 those <- seq(from=2,to=max(iteration.number),by=2)
 psy <- 1:5
 psy.one <- 1:5
-qc.flag <- rep("fail", times=5)
+# qc.flag <- rep("fail", times=5)
 
 
 # loop through each odd measurement (psys 1-5, discard those not between 4-5am, and then summarize/qc into df)
 l <- 0
+
 for (i in these){
   
   yr <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),3] #pulling out yr from header row indicated by 106
@@ -131,6 +132,7 @@ for (i in these){
   temp <- wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == 106),6] # pulling out ambient Temp from header row
   #if(time<500 & time >400){
     l <- l + 1
+    qc.flag <- rep("fail", times=5)
     j <- 0
     for (k in c(109,111,113,115,117)){
       j <- j + 1
@@ -176,7 +178,7 @@ for (i in these){
 
 ## load in newest version of qc1
 #qc1 <- read.csv("Psychrometer_QC1_20200319.csv")
-qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
+if(QC ==F) qc1 <- read.csv("Psychrometer_QC1_20180309.csv")[,-1]
 
 
 ### repeat for psychrometers 6-9
@@ -242,7 +244,7 @@ for (i in c(those)){
 ## read in newest version of qc2
 #qc2 <- read.csv("Psychrometer_QC2_20200319.csv")
 #qc2 <- read.csv("Psychrometer_QC2_20200315.csv")
-qc2 <- read.csv("Psychrometer_QC2_20180309.csv")
+if(QC==F) qc2 <- read.csv("Psychrometer_QC2_20180309.csv")[,-1]
 
 
 complete.data[,c(5:9)] <- complete.data[,c(5:9)]/(0.325+0.027*complete.data[,4]) 
@@ -319,7 +321,7 @@ wpslong1 <- gather(select(.data = complete.data, Yr,DOY,Time,Temp,PSY1:PSY5) , k
 
 # take qc1 and also make it long
 names(qc1)<- str_replace(names(qc1), pattern = ".qc","") # pull out the ".qc" part of the quality control data flag column names so they will match up with wpslong psychrometer names
-qualcont1 <- data.frame(complete.data[,1:4], qc1[,-1]) # tacking on date, time, temp info from complete.data and killig extra column named "X" that came in when we read.csv (was rownmanes)
+qualcont1 <- data.frame(complete.data[,1:4], qc1) # tacking on date, time, temp info from complete.data and killig extra column named "X" that came in when we read.csv (was rownmanes)
 qclong1 <- gather(qualcont1,key = "Psy_num", value="QC_flag", PSY1:PSY5 ) # take wide form and make long
 
 #merge wps and qc flags for first 5 psychrometers
@@ -333,7 +335,7 @@ wpslong2 <- gather(select(.data = complete.data.2, Yr,DOY,Time,Temp,PSY6:PSY9) ,
 
 # take qc2 and also make it long
 names(qc2)<- str_replace(names(qc2), pattern = ".qc","")
-qualcont2 <- data.frame(complete.data.2[,1:4], qc2[,-1])
+qualcont2 <- data.frame(complete.data.2[,1:4], qc2)
 qclong2 <- gather(qualcont2,key = "Psy_num", value="QC_flag", PSY6:PSY9 )
 
 #merge wps and qc flags
@@ -345,9 +347,19 @@ wps.all <- rbind(wps1, wps2)
 
 
 
+#++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+#### make final dataset, clean via QC flags ##########
+
 # now summarize all repeat measurments to get a mean per day. also filter out bad psychrmenter readings
+
+# ****old qc filtering with 20180309 qc1 & qc2 versions NA = bad, True = good, False=maybe
 wps.clean <- wps.all %>% filter(QC_flag==TRUE | QC_flag==FALSE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
 
+# ****new qc filtering with XXXXX qc1 & qc2 versions where 1 = good, 2 = mabye (prob keep), 3=worse (prob remove), 4 = REMOVE, & 5 = double check (prob remove?)
+#wps.clean <- wps.all %>% filter(QC_flag<3 ) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
+  # currently only selecting 1s and 2s
+  # QC_flag <4                (add in 3s)
+  # QC_flag %in% c(1,2,5)     (keeps 1s,2s, and 5s)
 
 
 ###### . Adding tag and treatment info ############
@@ -373,9 +385,8 @@ wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")
 wps.clean$DOY.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
 
 ### writing out the current output so that don't have to run this code every time to work with gasexdata.R
-if(QC==T){
-write.csv(wps.clean, paste0("WP_data_processed", qc.ver, ".csv")
-}
+if(QC==T) write.csv(wps.clean, paste0("WP_data_processed", qc.ver, ".csv")
+
 ###### END: average wps and turn long form ###################
 #____________________________________________________________________________
 
