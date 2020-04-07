@@ -4,7 +4,14 @@
 #          STEP 3: LOAD gasex data and combine lwp, aba, gs
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++
 
-
+require(tidyr)
+require(dplyr)
+require(stringr)
+library(dplyr)
+library(reshape2)
+library(RColorBrewer)
+library(stringr)
+library(ggplot2)
 
 ####### START: Load Data ############################
 #rm(list=ls())
@@ -67,7 +74,13 @@ head(gsaba)
 # enchilada <- left_join(gsaba, lwppd.all %>% select(doy.yr, tag, lwppd_MPa), by = c("Date"="doy.yr","tag"="tag"))
 
 
-# with Lee's new hotness
+# with Lee's new method
+# load in most recent version of wps.clean so don't have to run WP_Select code
+wps.clean <- read.csv("WP_data_processed20200327.csv")[,-1]
+wps.clean$DOY.yr <- as.Date(wps.clean$DOY.yr) # make sure DOY.yr is in Date format
+
+
+# merge gs & ABA data with wp data
 enchilada <- left_join(gsaba, wps.clean %>% select(DOY.yr, tag, lwp.m), by = c("Date"="DOY.yr","tag"="tag"))
 
 enchilada$treatment <- factor(enchilada$treatment)
@@ -142,7 +155,11 @@ for(i in unique(enchilada$tag)){
 }
 abline(v=as.Date("2018-06-28", "%F"))
 
+<<<<<<< HEAD
 #quartz.save("gs_lwp_ABA_time.pdf")
+=======
+#quartz.save("gs_lwp_ABA_throughtime_lines_v1.pdf")
+>>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 
 
@@ -150,6 +167,7 @@ abline(v=as.Date("2018-06-28", "%F"))
 
 
 # visualizing individual WPs in different panels
+<<<<<<< HEAD
 # quartz(width=5, height=6) #lwp
 # par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
 # for(i in unique(enchilada$tag)){
@@ -159,11 +177,25 @@ abline(v=as.Date("2018-06-28", "%F"))
 # 
 # 
 # quartz(width=5, height=6) #aba
+=======
+# quartz(width=5, height=6)
+# par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
+# for(i in unique(enchilada$tag)){
+#   plot(lwp.m~Date, enchilada[which(enchilada$tag==i & enchilada$lwp.m<0),], col=treatment, ylim=c(-6,0), xlim=as.Date(c("2018-04-27","2018-07-30")))
+# }
+# mtext(outer = T, side=3, "LWP")
+# 
+# quartz(width=5, height=6)
+>>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 # par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
 # for(i in unique(enchilada$tag)){
 #   plot(ABAFWngg~Date, enchilada[which(enchilada$tag==i),], col=treatment, xlim=as.Date(c("2018-04-27","2018-07-30")))
 # }
+<<<<<<< HEAD
 # mtext(outer=TRUE, side = 3, "ABA")
+=======
+# mtext(outer = T, side=3, "ABA")
+>>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 quartz(width=5, height=6)
 ggplot(enchilada, aes(x=Date, y=ABAFWngg,col=treatment)) + geom_point() + facet_wrap(facets = ~tag)
@@ -186,6 +218,7 @@ ggplot(gsaba[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), c
 quartz(width=5, height=6)
 ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
+<<<<<<< HEAD
 # quartz(width=5, height=6)
 # ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
@@ -194,6 +227,15 @@ ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(
 quartz(width=5, height=6)
 ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], aes(x=ABAFWngg, y=lwp.m, col=treatment)) + geom_point()
 #plot(lwp.m~ABAFWngg, enchilada, col=treatment)
+=======
+#quartz(width=5, height=6)
+#ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
+
+
+quartz(width=5, height=6)
+#plot(lwp.m~ABAFWngg, enchilada, col=treatment)
+ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], aes(x=ABAFWngg, y=lwp.m, col=treatment )) + geom_point()
+>>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 
 
