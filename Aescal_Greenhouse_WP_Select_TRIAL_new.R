@@ -10,7 +10,7 @@
 
 
 
-rm(list=ls())
+#rm(list=ls())
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 require(tidyr)
@@ -109,7 +109,7 @@ names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 
 # run through, pull out each psy measurement, and average values from the peaks
 QC <- T # T/F -run quality control script?
-qc.ver <- "20200319" #quality control version
+qc.ver <- "20200329" #quality control version
 
 
 these <- seq(from=1, to=max(iteration.number)-1, by=2)
@@ -166,14 +166,14 @@ for (i in these){
 }
 # _____________
 ## Uncomment to write new QC file ########
- #write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv")) #when doing quality control again, uncomment this, then update date of QC1_ file (seen in line 176)
+ write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv")) #when doing quality control again, uncomment this, then update date of QC1_ file (seen in line 176)
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
 ## load in newest version of qc1
-qc1 <- read.csv("Psychrometer_QC1_20200319.csv")
+qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
 
 
 ### repeat for psychrometers 6-9
@@ -230,14 +230,14 @@ for (i in c(those)){
 
 # _____________
 ## Uncomment to write new QC file ########
- write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
+ #write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
 ## read in newest version of qc2
-qc2 <- read.csv("Psychrometer_QC2_20200319.csv")
+qc2 <- read.csv("Psychrometer_QC2_20180309.csv")
 
 
 complete.data[,c(5:9)] <- complete.data[,c(5:9)]/(0.325+0.027*complete.data[,4]) 
