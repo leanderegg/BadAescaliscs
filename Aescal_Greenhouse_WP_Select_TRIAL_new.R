@@ -6,7 +6,7 @@
 ### UPDATE VERSION IF REPROCESSING QC #######
 
 # run through, pull out each psy measurement, and average values from the peaks
-QC <- F # T/F -run quality control script?
+QC <- T # T/F -run quality control script?
 # qc.ver <- "20200327" #last version, didn't actually work so still using original manual QC
 qc.ver <- "202004XX" #quality control version
 
