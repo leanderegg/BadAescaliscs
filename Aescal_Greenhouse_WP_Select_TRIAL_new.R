@@ -6,9 +6,9 @@
 ### UPDATE VERSION IF REPROCESSING QC #######
 
 # run through, pull out each psy measurement, and average values from the peaks
-QC <- T # T/F -run quality control script?
+QC <- F # T/F -run quality control script?
 # qc.ver <- "20200327" #last version, didn't actually work so still using original manual QC
-qc.ver <- "202004XX" #quality control version
+qc.ver <- "20200429" #quality control version
 
 # clear Environment?
 # rm(list=ls())
@@ -17,10 +17,6 @@ qc.ver <- "202004XX" #quality control version
 
 
 
-<<<<<<< HEAD
-#rm(list=ls())
-=======
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 # set working directory
 #setwd("~/Documents/RESEARCH/California Buckeye/")
 require(tidyr)
@@ -56,6 +52,7 @@ wpdata.pd <- wpdata.raw.n[which(wpdata.raw.n[,1] %in% predawns),]
 wpdata <- wpdata.pd %>% select(V1:V13)
 
 
+
 # old manually cleaned dataset
 #wpdata<-read.csv("GREENHOUSEWPselect.csv", header = FALSE)
 head(wpdata)
@@ -68,6 +65,18 @@ head(wpdata)
 iteration.number <- rep(c(1:(nrow(wpdata)/6)), each=6)
 wpdata.n <- cbind(iteration.number,wpdata)
 numberofiterations <- max(iteration.number)/2
+
+###### Create empty dataframes for QC flags
+#make an additional matrix for storing QC flags for each psy for each measurement
+qc1 <- data.frame(matrix(NA, ncol=5, nrow=numberofiterations))
+names(qc1) <- c("PSY1.qc","PSY2.qc","PSY3.qc", "PSY4.qc", "PSY5.qc")
+
+#make an additional matrix for storing QC flags for each psy for each measurement
+qc2 <- data.frame(matrix(NA, ncol=4, nrow=numberofiterations))
+names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
+#________________
+
+
 
 complete.data <- matrix(NA, ncol=14, nrow=numberofiterations)
 complete.data <- as.data.frame(complete.data)
@@ -84,10 +93,6 @@ complete.data[,9] <- as.numeric(complete.data[,9])
 
 colnames(complete.data) <- c("Yr","DOY","Time","Temp","PSY1","PSY2","PSY3","PSY4","PSY5","PSY.one1","PSY.one2","PSY.one3","PSY.one4","PSY.one5")
 
-#make an additional matrix for storing QC flags for each psy for each measurement
-qc1 <- data.frame(matrix(NA, ncol=5, nrow=numberofiterations))
-names(qc1) <- c("PSY1.qc","PSY2.qc","PSY3.qc", "PSY4.qc", "PSY5.qc")
-
 
 complete.data.2 <- matrix(NA, ncol=12, nrow=numberofiterations)
 complete.data.2 <- as.data.frame(complete.data.2)
@@ -101,9 +106,7 @@ complete.data.2[,7] <- as.numeric(complete.data.2[,7])
 complete.data.2[,8] <- as.numeric(complete.data.2[,8])
 colnames(complete.data.2) <- c("Yr","DOY","Time","Temp","PSY6","PSY7","PSY8","PSY9","PSY.one6","PSY.one7","PSY.one8","PSY.one9")
 
-#make an additional matrix for storing QC flags for each psy for each measurement
-qc2 <- data.frame(matrix(NA, ncol=4, nrow=numberofiterations))
-names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
+
 
 
 # Rob being a crazy guy, getting the odd numbers...
@@ -117,13 +120,6 @@ names(qc2) <- c("PSY6.qc","PSY7.qc","PSY8.qc", "PSY9.qc")
 # these <- which(ncombine[,3] < max(iteration.number))
 
 
-<<<<<<< HEAD
-# run through, pull out each psy measurement, and average values from the peaks
-QC <- T # T/F -run quality control script?
-qc.ver <- "20200329" #quality control version
-
-=======
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 these <- seq(from=1, to=max(iteration.number)-1, by=2)
 those <- seq(from=2,to=max(iteration.number),by=2)
@@ -134,6 +130,12 @@ psy.one <- 1:5
 
 # loop through each odd measurement (psys 1-5, discard those not between 4-5am, and then summarize/qc into df)
 l <- 0
+
+#### for restarting if you stop (set l and the last number in these[-c(1:#)] to the last row -1 that you have filled in qc or complete.data.n):
+# l <- 71
+# these <- seq(from=1, to=max(iteration.number)-1, by=2)
+# these <- these[-c(1:71)]
+#
 
 for (i in these){
   
@@ -158,7 +160,11 @@ for (i in these){
           qc.flag[j] <- NA 
         }
         else{
-          plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
+          par(mar=c(3.5,3.5,1,.5), mfrow=c(1,2))
+          plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3, ylab="",xlab="")
+          points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
+          print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j, "DOY=",doy, "time=", time))
+          plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3, ylim=c(0,13), ylab="",xlab="")
           points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
           print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
           #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
@@ -181,19 +187,18 @@ for (i in these){
 }
 # _____________
 ## Uncomment to write new QC file ########
- write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv")) #when doing quality control again, uncomment this, then update date of QC1_ file (seen in line 176)
+if(QC==T) write.csv(qc1, paste0("Psychrometer_QC1_", qc.ver,".csv")) #when doing quality control again, uncomment this, then update date of QC1_ file (seen in line 176)
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
+
 ## load in newest version of qc1
-<<<<<<< HEAD
-qc1 <- read.csv("Psychrometer_QC1_20180309.csv")
-=======
+
 #qc1 <- read.csv("Psychrometer_QC1_20200319.csv")
-if(QC ==F) qc1 <- read.csv("Psychrometer_QC1_20180309.csv")[,-1]
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
+if(QC ==F) qc1 <- read.csv("Psychrometer_QC1_20200428.csv")[,-1]
+
 
 
 ### repeat for psychrometers 6-9
@@ -227,11 +232,16 @@ for (i in c(those)){
         qc.flag[j] <- NA 
       }
       else{
-        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3)
+        par(mar=c(3.5,3.5,1,.5), mfrow=c(1,2))
+        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3, ylab="",xlab="")
+        points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
+        print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j, "DOY=",doy, "time=", time))
+        plot(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(5:14)])), typ="b", lwd=3, ylim=c(0,13), ylab="",xlab="")
         points(c(unlist(wpdata.n[which(wpdata.n[,1] == i & wpdata.n[,2] == k),c(6:8)]))~c(2,3,4),pch=16, col="red")
         print(paste("i=",i,"k=",k, "qc.row=",l,"qc.col=",j))
         #qc.flag[j] <- askYesNo("Quality of trace?(1=good,2=kinda bad, 3=DELETE)", default=F, prompts=getOption("askYesNo", gettext(c("1","2","3"))))
         qc.flag[j] <- as.numeric(readline(prompt="Quality of trace?(1=good,2=maybe, 3=worse, 4=DELETE, 5=double check): "))
+        
       }
       
     }
@@ -250,24 +260,20 @@ for (i in c(those)){
 
 # _____________
 ## Uncomment to write new QC file ########
-<<<<<<< HEAD
- #write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
-=======
-# write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
+
+if(QC==T) write.csv(qc2, paste0("Psychrometer_QC2_", qc.ver,".csv")) #follow instructions from above 
+
 #_______________
 
 # v1 - 20180309: for GREENHOUSEWPselect.csv manually cleaned. and Lee can't write dates
 # v2 - 20200315: for cleaned GREENHOUSEWPmanual.csv
 
 ## read in newest version of qc2
-<<<<<<< HEAD
-qc2 <- read.csv("Psychrometer_QC2_20180309.csv")
-=======
+
 #qc2 <- read.csv("Psychrometer_QC2_20200319.csv")
 #qc2 <- read.csv("Psychrometer_QC2_20200315.csv")
-if(QC==F) qc2 <- read.csv("Psychrometer_QC2_20180309.csv")[,-1]
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
+if(QC==F) qc2 <- read.csv("Psychrometer_QC2_20200428.csv")[,-1]
+
 
 
 complete.data[,c(5:9)] <- complete.data[,c(5:9)]/(0.325+0.027*complete.data[,4]) 
@@ -304,9 +310,9 @@ complete.data.2[,12] <- (complete.data.2[,12]-calib[9,3])/calib[9,2]
 ####### Quick visualizing raw output ###########################3
 #raw predawn traces (for all psychrometers)
 par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
-cols <- c("black","red","blue","darkgreen","brown","turquoise","violet","darkorange","cornflowerblue")
+cols <- c("black","darkgreen","darkred","blue","red","brown","turquoise","violet","darkorange","cornflowerblue")
 for (i in c(5:9)){
-  plot(complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,i]~complete.data[complete.data[,3] < 500 & complete.data[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i-4])
+  plot(complete.data[,i]~complete.data[,2],ylim=c(-6,0),las=1, col=cols[as.numeric(qc1[,i-4])], pch=qc1[,i-4])
 }
 for (i in c(5:8)){
   plot(complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,i]~complete.data.2[complete.data.2[,3] < 500 & complete.data.2[,3] > 400,2],ylim=c(-6,0),las=1, col=cols[i+1])
@@ -331,8 +337,6 @@ for (i in c(5:8)){
 
 #________________________________________________________________________
 #### START: Lee's new way of processing wp data to long form ########
-
-
 
 # step 1: take wide data and make it long
 # step 2: merge in quality control flags
@@ -367,8 +371,46 @@ wps2 <- full_join(wpslong2, qclong2)
 
 # row bind psychrometers 1-5 and 6-9 together into one dataframe
 wps.all <- rbind(wps1, wps2)
+wps.all$ind<- as.numeric(str_replace(wps.all$Psy_num,"PSY", ""))
 
 
+### add in a 'tag' column to match rest of dataset:
+tag <- c(590,592,589,498,10999,588,591,10954,600)
+ind <- c(1:9)
+treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
+tag.mapper <- data.frame(tag, ind, treatment)
+
+# add final column to wp data with individuals tag name and treatment
+wps.all$tag <- tag.mapper$tag[match(wps.all$ind, tag.mapper$ind)]
+wps.all$treatment <- tag.mapper$treatment[match(wps.all$ind, tag.mapper$ind)]
+
+
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+### Plotting to examine QC flags and do final clean ##########
+
+par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
+
+
+wps.all$QC_flag_updated <- wps.all$QC_flag
+
+# looks like all of the 5's before DOY 189 are probably funky values
+wps.all$QC_flag_updated[which(wps.all$QC_flag==5 & wps.all$DOY<189)] <- "4"
+wps.all$QC_flag_updated[which(wps.all$QC_flag==2 & wps.all$DOY>180 & wps.all$ind==7)] <- "4"
+
+
+wps.tmp <- wps.all[which(wps.all$QC_flag_updated %in% c("1","2","5")),]
+
+par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
+
+for(i in unique(wps.tmp$Psy_num)){
+  plot(lwppd~DOY,wps.tmp[which(wps.tmp$Psy_num==i),],ylim=c(-6,0),las=1, col=as.numeric(QC_flag), pch=QC_flag, xlim=c(169,208))
+  abline(v=178)
+  abline(v=198, col="lightblue")
+  legend("bottom",bty="n", legend=unique(wps.tmp$treatment[which(wps.tmp$Psy_num==i)]))
+}
+
+# write.csv(wps.all, paste0("Psychrometer_all_longform_unaveraged_", qc.ver, ".csv"))
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #### make final dataset, clean via QC flags ##########
@@ -390,17 +432,17 @@ wps.clean <- wps.all %>% filter(QC_flag==TRUE | QC_flag==FALSE) %>% group_by(Yr,
 wps.clean$ind <- as.numeric(str_replace(wps.clean$Psy_num,"PSY", ""))
 
 
-
-### add in a 'tag' column to match rest of dataset:
-tag <- c(590,592,589,498,10999,588,591,10954,600)
-ind <- c(1:9)
-treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
-tag.mapper <- data.frame(tag, ind, treatment)
-
-# add final column to wp data with individuals tag name and treatment
-wps.clean$tag <- tag.mapper$tag[match(wps.clean$ind, tag.mapper$ind)]
-wps.clean$treatment <- tag.mapper$treatment[match(wps.clean$ind, tag.mapper$ind)]
-
+# 
+# ### add in a 'tag' column to match rest of dataset:
+# tag <- c(590,592,589,498,10999,588,591,10954,600)
+# ind <- c(1:9)
+# treatment <- c("swd", "mwd", "control", "control","mwd","swd","swd","control","mwd")
+# tag.mapper <- data.frame(tag, ind, treatment)
+# 
+# # add final column to wp data with individuals tag name and treatment
+# wps.clean$tag <- tag.mapper$tag[match(wps.clean$ind, tag.mapper$ind)]
+# wps.clean$treatment <- tag.mapper$treatment[match(wps.clean$ind, tag.mapper$ind)]
+# 
 
 # convert DOY to dates so we can match
 wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")

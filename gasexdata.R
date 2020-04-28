@@ -155,11 +155,7 @@ for(i in unique(enchilada$tag)){
 }
 abline(v=as.Date("2018-06-28", "%F"))
 
-<<<<<<< HEAD
-#quartz.save("gs_lwp_ABA_time.pdf")
-=======
 #quartz.save("gs_lwp_ABA_throughtime_lines_v1.pdf")
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 
 
@@ -167,7 +163,6 @@ abline(v=as.Date("2018-06-28", "%F"))
 
 
 # visualizing individual WPs in different panels
-<<<<<<< HEAD
 # quartz(width=5, height=6) #lwp
 # par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
 # for(i in unique(enchilada$tag)){
@@ -177,25 +172,13 @@ abline(v=as.Date("2018-06-28", "%F"))
 # 
 # 
 # quartz(width=5, height=6) #aba
-=======
-# quartz(width=5, height=6)
-# par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
-# for(i in unique(enchilada$tag)){
-#   plot(lwp.m~Date, enchilada[which(enchilada$tag==i & enchilada$lwp.m<0),], col=treatment, ylim=c(-6,0), xlim=as.Date(c("2018-04-27","2018-07-30")))
-# }
-# mtext(outer = T, side=3, "LWP")
-# 
-# quartz(width=5, height=6)
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
+
 # par(mfcol=c(5,2), oma=c(4,4,3,0.1),mar=c(1,1,0.1,0.1))
 # for(i in unique(enchilada$tag)){
 #   plot(ABAFWngg~Date, enchilada[which(enchilada$tag==i),], col=treatment, xlim=as.Date(c("2018-04-27","2018-07-30")))
 # }
-<<<<<<< HEAD
+
 # mtext(outer=TRUE, side = 3, "ABA")
-=======
-# mtext(outer = T, side=3, "ABA")
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
 
 quartz(width=5, height=6)
 ggplot(enchilada, aes(x=Date, y=ABAFWngg,col=treatment)) + geom_point() + facet_wrap(facets = ~tag)
@@ -218,16 +201,6 @@ ggplot(gsaba[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), c
 quartz(width=5, height=6)
 ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
-<<<<<<< HEAD
-# quartz(width=5, height=6)
-# ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
-
-
-#minus pre-treatment
-quartz(width=5, height=6)
-ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], aes(x=ABAFWngg, y=lwp.m, col=treatment)) + geom_point()
-#plot(lwp.m~ABAFWngg, enchilada, col=treatment)
-=======
 #quartz(width=5, height=6)
 #ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
 
@@ -235,7 +208,7 @@ ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], ae
 quartz(width=5, height=6)
 #plot(lwp.m~ABAFWngg, enchilada, col=treatment)
 ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], aes(x=ABAFWngg, y=lwp.m, col=treatment )) + geom_point()
->>>>>>> 72d03c763bb0c15d9c9b5d700fd2d930d85a4716
+
 
 
 
