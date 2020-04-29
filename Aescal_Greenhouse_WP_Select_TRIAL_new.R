@@ -387,30 +387,47 @@ wps.all$treatment <- tag.mapper$treatment[match(wps.all$ind, tag.mapper$ind)]
 
 
 #+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-### Plotting to examine QC flags and do final clean ##########
+### CLEANING QC FLAGS and wps ##########
 
-par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
-
-
+# make a new column for post-hoc flag changes
+  # NOTE: gonna make a new category "6" for things labeled 1,2 or 5 but questionable post-hoc
 wps.all$QC_flag_updated <- wps.all$QC_flag
 
 # looks like all of the 5's before DOY 189 are probably funky values
 wps.all$QC_flag_updated[which(wps.all$QC_flag==5 & wps.all$DOY<189)] <- "4"
+# one very neagitve mesurement labeled 2 while all the rest flagged, gonna toss
 wps.all$QC_flag_updated[which(wps.all$QC_flag==2 & wps.all$DOY>180 & wps.all$ind==7)] <- "4"
+# seems like many of PSY8's values are suspect. Certainly the one "1" in the field of 5s seems suspect at around doy 192
+wps.all$QC_flag_updated[which(wps.all$ind==8 & wps.all$lwppd<= -2.7)] <- "4" 
+# strange day circa 199 in PSY7 where 4 measurements differ by 2+ MPa. not sure what to make of that... 
+  #(2 flagged as 5, 3 as 3 and 2 as 1) --> maybe whol measurement is bad? Could be reasonable given that 588 was rewatered on 202...
+  # currently just threw out 5s, but need to double check
+wps.all$QC_flag_updated[which(wps.all$ind==7 & wps.all$DOY==199 & wps.all$lwppd< -3)] <- "4"
+# one value mislabeld "31", must have meant 3
+wps.all$QC_flag_updated[which(wps.all$QC_flag=="31")] <- "3"
 
+# values that seem questionable but leaving in to test how they affect other relationships later on:
+wps.all$QC_flag_updated[which(wps.all$ind==7 & wps.all$DOY==199 & wps.all$QC_flag=="1")] <- "6"
+wps.all$QC_flag_updated[which(wps.all$ind==1 & wps.all$DOY==190)] <- "6"
+wps.all$QC_flag_updated[which(wps.all$ind==2 & wps.all$DOY> 205)] <- "6" # the final two measurement dates of PSY2 look FUNKY, and evidently the last was all 3's except on 5
+wps.all$QC_flag_updated[which(wps.all$ind==7 & wps.all$DOY>202 & wps.all$QC_flag=="5")] <- "6"
+wps.all$QC_flag_updated[which(wps.all$ind==8 & wps.all$lwppd< -2.2 & wps.all$QC_flag=="1")] <- "6"
 
-wps.tmp <- wps.all[which(wps.all$QC_flag_updated %in% c("1","2","5")),]
+wps.tmp <- wps.all[which(wps.all$QC_flag_updated %in% c("1","2","5","6")),]
 
 par(mfcol=c(5,2), oma=c(4,4,0.1,0.1),mar=c(1,1,0.1,0.1))
 
 for(i in unique(wps.tmp$Psy_num)){
-  plot(lwppd~DOY,wps.tmp[which(wps.tmp$Psy_num==i),],ylim=c(-6,0),las=1, col=as.numeric(QC_flag), pch=QC_flag, xlim=c(169,208))
+  plot(lwppd~DOY,wps.tmp[which(wps.tmp$Psy_num==i),],ylim=c(-6,0),las=1, col=as.numeric(QC_flag_updated), pch=QC_flag_updated, xlim=c(169,208))
   abline(v=178)
   abline(v=198, col="lightblue")
   legend("bottom",bty="n", legend=unique(wps.tmp$treatment[which(wps.tmp$Psy_num==i)]))
 }
 
-# write.csv(wps.all, paste0("Psychrometer_all_longform_unaveraged_", qc.ver, ".csv"))
+#write.csv(wps.all, paste0("Psychrometer_all_longform_unaveraged_", qc.ver, ".csv"))
+
+# Moste recent: v "20200429"
+
 
 #++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 #### make final dataset, clean via QC flags ##########
@@ -418,7 +435,8 @@ for(i in unique(wps.tmp$Psy_num)){
 # now summarize all repeat measurments to get a mean per day. also filter out bad psychrmenter readings
 
 # ****old qc filtering with 20180309 qc1 & qc2 versions NA = bad, True = good, False=maybe
-wps.clean <- wps.all %>% filter(QC_flag==TRUE | QC_flag==FALSE) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
+wps.clean <- wps.all %>% filter(QC_flag_updated %in% c("1","2","5","6")) %>% group_by(Yr, DOY, Psy_num, ind, treatment, tag) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n()
+                                                                                                                      , Temp.m = mean(Temp), Temp.sd = sd(Temp),flags = length(which(QC_flag_updated=="6")) )
 
 # ****new qc filtering with XXXXX qc1 & qc2 versions where 1 = good, 2 = mabye (prob keep), 3=worse (prob remove), 4 = REMOVE, & 5 = double check (prob remove?)
 #wps.clean <- wps.all %>% filter(QC_flag<3 ) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
@@ -429,7 +447,7 @@ wps.clean <- wps.all %>% filter(QC_flag==TRUE | QC_flag==FALSE) %>% group_by(Yr,
 
 ###### . Adding tag and treatment info ############
 # extract individuals for matching up with tags
-wps.clean$ind <- as.numeric(str_replace(wps.clean$Psy_num,"PSY", ""))
+#wps.clean$ind <- as.numeric(str_replace(wps.clean$Psy_num,"PSY", ""))
 
 
 # 
@@ -450,7 +468,9 @@ wps.clean$doy.yr <- paste(wps.clean$DOY, "18", sep="-")
 wps.clean$DOY.yr <- as.Date(wps.clean$doy.yr, "%j-%y")
 
 ### writing out the current output so that don't have to run this code every time to work with gasexdata.R
-if(QC==T) write.csv(wps.clean, paste0("WP_data_processed", qc.ver, ".csv")
+if(QC==T) write.csv(wps.clean, paste0("WP_data_processed", qc.ver, ".csv"))
+
+# current version: c "20200429"
 
 ###### END: average wps and turn long form ###################
 #____________________________________________________________________________

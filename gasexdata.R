@@ -52,7 +52,7 @@ gasexchange$treatment[gasexchange$tag %in% severe] <- "severe"
 
 
 
-####### Combine ABA and LWP data w/ gasex #############3
+####### Combine ABA data w/ gasex #############
 
 ## aba from ABA.R (Step 2)
 
@@ -67,6 +67,7 @@ head(gsaba)
 
 
 
+####### Combine LWP data w/ gasex #############
 
 ## wps.clean from Aescal_Greenhous_WP_Select.R (Step 1)
 
@@ -76,7 +77,7 @@ head(gsaba)
 
 # with Lee's new method
 # load in most recent version of wps.clean so don't have to run WP_Select code
-wps.clean <- read.csv("WP_data_processed20200327.csv")[,-1]
+wps.clean <- read.csv("WP_data_processed20200429.csv")[,-1]
 wps.clean$DOY.yr <- as.Date(wps.clean$DOY.yr) # make sure DOY.yr is in Date format
 
 
@@ -207,7 +208,7 @@ ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(
 
 quartz(width=5, height=6)
 #plot(lwp.m~ABAFWngg, enchilada, col=treatment)
-ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28"),], aes(x=ABAFWngg, y=lwp.m, col=treatment )) + geom_point()
+ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28" ),], aes(x=ABAFWngg, y=lwp.m, col=treatment, size=time.since.rewater+1 )) + geom_point()
 
 
 
