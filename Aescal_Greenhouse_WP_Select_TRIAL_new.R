@@ -438,6 +438,10 @@ for(i in unique(wps.tmp$Psy_num)){
 wps.clean <- wps.all %>% filter(QC_flag_updated %in% c("1","2","5","6")) %>% group_by(Yr, DOY, Psy_num, ind, treatment, tag) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n()
                                                                                                                       , Temp.m = mean(Temp), Temp.sd = sd(Temp),flags = length(which(QC_flag_updated=="6")) )
 
+wps.treat <- wps.clean %>% group_by(treatment, Yr, DOY) %>% summarize(mlwp = mean(lwp.m, na.rm=T), minlwp = min(lwp.m, na.rm=T), maxlwp = max(lwp.m, na.rm=T))
+
+ggplot(wps.treat[-which(wps.treat$treatment=="control" & wps.treat$DOY<195),], aes(x=DOY, y=mlwp, col=treatment)) + geom_point() + geom_smooth(se=F) + geom_vline(xintercept=179) + geom_vline(xintercept=200)
+
 # ****new qc filtering with XXXXX qc1 & qc2 versions where 1 = good, 2 = mabye (prob keep), 3=worse (prob remove), 4 = REMOVE, & 5 = double check (prob remove?)
 #wps.clean <- wps.all %>% filter(QC_flag<3 ) %>% group_by(Yr, DOY, Psy_num) %>% summarise(lwp.m = mean(lwppd, na.rm=T), lwp.sd = sd(lwppd, na.rm=T), lwp.n = n(), Temp.m = mean(Temp), Temp.sd = sd(Temp))
   # currently only selecting 1s and 2s

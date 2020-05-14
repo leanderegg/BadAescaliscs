@@ -12,6 +12,7 @@ library(reshape2)
 library(RColorBrewer)
 library(stringr)
 library(ggplot2)
+library(zoo)
 
 ####### START: Load Data ############################
 #rm(list=ls())
@@ -59,9 +60,14 @@ gasexchange$treatment[gasexchange$tag %in% severe] <- "severe"
 # quick rename "999" and "954" to "10###"
 aba$tag[which(aba$tag == 999)] <- 10999
 aba$tag[which(aba$tag == 954)] <- 10954
+# average any repeated measurements to the day (11 repeated measurements)
+aba.clean <- aba %>% group_by(tag, treatment, date) %>% summarise(ABAFWngg = mean(ABAFWngg, na.rm=T))
 # aba$tag <- as.numeric(aba$tag) # make numeric to match gasexchange, which as a numeric 'tag' column
-gsaba <- left_join(gasexchange, aba, by=c("tag"="tag","Date"="date", "treatment"="treatment"))
-gsaba$time.since.start <- NULL
+gsaba <- left_join(gasexchange, aba.clean, by=c("tag"="tag","Date"="date", "treatment"="treatment"))
+# gsaba$time.since.start <- NULL # kill time.since.start - but now killed in the combination to aba.clean step
+gsaba$lwp <- NULL
+gsaba$treatment <- factor(gsaba$treatment)
+levels(gsaba$treatment) <- list(control="control",mwd="mild",swd="severe")
 head(gsaba)
 
 
@@ -82,9 +88,15 @@ wps.clean$DOY.yr <- as.Date(wps.clean$DOY.yr) # make sure DOY.yr is in Date form
 
 
 # merge gs & ABA data with wp data
-enchilada <- left_join(gsaba, wps.clean %>% select(DOY.yr, tag, lwp.m), by = c("Date"="DOY.yr","tag"="tag"))
+enchilada <- full_join(gsaba, wps.clean %>% select(DOY.yr, tag,treatment, lwp.m, lwp.n, flags), by = c("Date"="DOY.yr","tag"="tag", "treatment"="treatment")) %>% arrange(tag, Date)
 
 enchilada$treatment <- factor(enchilada$treatment)
+enchilada$tag <- factor(enchilada$tag)
+enchilada$WUE <- enchilada$Amax/enchilada$gs
+# kill one obvious outlier
+enchilada$Amax[which(enchilada$WUE>0.4)] <- NA
+enchilada$gs[which(enchilada$WUE>0.4)] <- NA
+enchilada$WUE[which(enchilada$WUE>0.4)] <- NA
 # and kill some useless columns that we'll add back in eventually
 enchilada$time.since.start <- NULL
 enchilada$yr <- NULL
@@ -110,34 +122,109 @@ enchilada$time.since.rewater[which(enchilada$tag=="590")] <- enchilada$DOY[which
 enchilada$time.since.rewater[which(enchilada$tag=="588")] <- enchilada$DOY[which(enchilada$tag=="588")] - 202
 enchilada$time.since.rewater[which(enchilada$time.since.rewater<0)] <- 0
 
+# make a variable for watering status (0=watered, 1=droughted, 2=rewatered)
+enchilada$watered <- 0
+enchilada$watered[which(enchilada$tag %in% c("591","10999","592","600","590","588") & enchilada$time.since.start>0)] <- 1
+enchilada$watered[which(enchilada$time.since.rewater>0)] <- 2
+
+# also making a factor for the water status
+enchilada$water.status <- factor(enchilada$watered)
+levels(enchilada$water.status) <- list(watered=0, drought=1, rewatered=2)
+
+# it's getting annoying to clean the lwp by filtering for 'flags==0', so just going to make lwp.clean column
+enchilada$lwp.clean <- enchilada$lwp.m
+enchilada$lwp.clean[which(enchilada$flags>0)] <- NA
 
 
+ 
 
-
-
-# 
-# 
-# 
 # ####### Adding some derived metrics ############
-# 
-# # set a minimum water potential for each individual
-# ench <- enchilada %>% group_by(ID, tag, treatment) %>% summarise(minlwp = min(lwp.m, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T))
-# 
-# ench$date.min <- as.Date(NA)
-# for(i in unique(enchilada$tag)){
-#   tmp <- enchilada[which(enchilada$tag==i),]
-#   ench$date.min[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwp.m == min(tmp$lwp.m, na.rm=T))])
-# }
-# 
-# # add in to enchilada a column indicating min wp, and date of min so we can analyze recover
-# enchilada$minlwp <- ench$minlwp[match(enchilada$tag, ench$tag)]
-# enchilada$date.min <- ench$date.min[match(enchilada$tag, ench$tag)]
+
+# set a minimum water potential, gs, Amax and max ABA for each individual
+  # only using period between start of drydown and the start of rewatering
+ench <- enchilada %>% group_by(tag, treatment) %>% filter(DOY>179 & watered<2) %>% summarise(minlwp.flag = min(lwp.m, na.rm=T), minlwp=min(lwp.clean, na.rm=T), minlwp.smooth=min(lwp.smooth, na.rm=T), maxABA = max(ABAFWngg, na.rm=T), mings=min(gs, na.rm=T), minAmax = min(Amax, na.rm=T))
+
+# calculate the maximum post-experiment rates for recovery
+recov <- enchilada %>% group_by(tag) %>% 
+  filter(time.since.rewater>0) %>% 
+  summarise(maxlwp.recov = max(lwp.clean, na.rm=T), maxlwp.flag.recov= max(lwp.m, na.rm=T), maxlwp.smooth.recov=max(lwp.smooth, na.rm=T),
+            minABA.recov = min(ABAFWngg, na.rm=T), maxAmax.recov = max(Amax, na.rm=T), maxgs.recov=max(gs, na.rm=T))
+
+
+enc <- left_join(ench, recov)
+
+
+#### Quick ANOVAs to see whether treatments actually differed:
+
+summary(aov(minlwp~treatment, ench[-1,])) # p=0.241
+summary(aov(minlwp.flag~treatment, ench[-1,])) # p=0.0745 .
+summary(aov(minlwp.smooth~treatment, ench[-1,])) # p=0.394
+summary(aov(maxABA~treatment, ench[-1,])) # p=0.151 (looks obvious that controls are lower max ABA, but low sample size) 
+summary(aov(mings~treatment, ench[-1,])) # p=0.00173**
+summary(aov(minAmax~treatment, ench[-1,])) # p=0.0253*
+  # so gas ex does, ABA is close, but filtered lwp doesn't and unfiltered is close
+
+
+# pull out the date of the lowest/highest values
+ench$date.min.lwp <- as.Date(NA)
+ench$date.max.ABA <- as.Date(NA)
+ench$date.min.gs <- as.Date(NA)
+ench$date.min.Amax <- as.Date(NA)
+for(i in unique(enchilada$tag)[-1]){
+  tmp <- enchilada[which(enchilada$tag==i & enchilada$DOY>179 & enchilada$watered<2),]
+  ench$date.min.lwp[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$lwp.m == min(tmp$lwp.m, na.rm=T))])
+  ench$date.max.ABA[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$ABAFWngg == max(tmp$ABAFWngg, na.rm=T))])
+  ench$date.min.gs[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$gs == min(tmp$gs, na.rm=T))])
+  ench$date.min.Amax[which(ench$tag==i)] <- as.Date(tmp$Date[which(tmp$Amax == min(tmp$Amax, na.rm=T))])
+  
+}
+
+# add in to enchilada a column indicating min wp, and date of min so we can analyze recovery
+enchilada$minlwp <- ench$minlwp[match(enchilada$tag, ench$tag)]
+enchilada$date.minlwp <- ench$date.min.lwp[match(enchilada$tag, ench$tag)]
+enchilada$minlwp.smooth <- ench$minlwp.smooth[match(enchilada$tag, ench$tag)]
+enchilada$maxABA <- ench$maxABA[match(enchilada$tag, ench$tag)]
+enchilada$date.maxABA <- ench$date.max.ABA[match(enchilada$tag, ench$tag)]
+enchilada$mings <- ench$mings[match(enchilada$tag, ench$tag)]
+enchilada$date.mings <- ench$date.min.gs[match(enchilada$tag, ench$tag)]
+enchilada$minAmax <- ench$minAmax[match(enchilada$tag, ench$tag)]
+enchilada$date.minAmax <- ench$date.min.Amax[match(enchilada$tag, ench$tag)]
+
+enchilada$Amax[which(enchilada$tag==590 & enchilada$time.since.rewater>0)] <- 1
+
+#### Smoothing lwp with a loess smoother:
+
+## quick visual of what this code is doing (for random individual 589):
+# lwp.smoothed <- loess(lwp.clean~DOY, data=enchilada[which(enchilada$tag==589),])
+# sm <- predict(lwp.smoothed)
+# plot(lwp.clean~DOY, enchilada[which(enchilada$tag==589),])
+# lines(sm~enchilada$DOY[which(enchilada$tag==589 & enchilada$lwp.clean<1)])
+
+# now loop through individuals (except 159, which has no data), fit the smoother, use predict to add to df
+enchilada$lwp.smooth <- NA
+for(i in unique(enchilada$tag)[-1]){
+  smoothed.lwp <- loess(lwp.clean~DOY, data=enchilada[which(enchilada$tag==i),])
+  enchilada$lwp.smooth[which(enchilada$tag==i & enchilada$lwp.clean<1)] <- predict(smoothed.lwp)
+}
+
+
+
+### calculate treatment means ###
+treat.means <- enchilada %>% group_by(DOY, Date, treatment) %>% summarise(lwp=mean(lwp.m, na.rm=T), ABA = mean(ABAFWngg, na.rm=T), gs = mean(gs, na.rm=T), E=mean(E, na.rm=T), Amax=mean(Amax, na.rm=T))
+
+
+
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+########## BEGIN: FIGURES #####################################
+#+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 
 #_________________________________________________________
-####### Plot timecourses of Gs, LWP, and ABA #########
+####### TIMECOURSE FIGURES #########
 #_________________________________________________________
 
+
+#### .. Old line figures #####
 quartz(width=5, height=6)
 par(mfrow=c(3,1), mar=c(0,4,0,1), oma=c(4,0,1,0))
 plot(gs~Date, enchilada, col=treatment, pch=16, type="n")
@@ -159,8 +246,102 @@ abline(v=as.Date("2018-06-28", "%F"))
 #quartz.save("gs_lwp_ABA_throughtime_lines_v1.pdf")
 
 
+### .. Newer point figures (all inds one plot) ####
+
+# *** ALL DATA ***
+  # note: to add a line for the treatment means, add: 
+  #           + geom_line(data=treat.means[which(!is.na(treat.means$gs)),], aes(col=treatment, shape=NULL), size=1.5)
+  #       to add a line for the loess smothing of each treatment, add:   
+  #           + geom_smooth(se=F, aes(pch=NULL))
+
+#*** Gs
+ggplot(enchilada, aes(x=DOY, y=gs, col=factor(treatment), shape=water.status)) + geom_point() + geom_vline(xintercept=179) +
+  geom_line(data=treat.means[which(!is.na(treat.means$gs)),], aes(col=treatment, shape=NULL), size=1.5)
+
+#*** E
+ggplot(enchilada, aes(x=DOY, y=E, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
+#*** Amax
+ggplot(enchilada, aes(x=DOY, y=Amax, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
+#*** lwp (without removing flags)
+# ggplot(enchilada, aes(x=DOY, y=lwp.m, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
+#*** lwp (flags removed)
+ggplot(enchilada, aes(x=DOY, y=lwp.clean, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
+#*** ABA
+ggplot(enchilada, aes(x=DOY, y=gs, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
 
 
+# *** Experiment Only ***
+    # removed data pre-DOY=170
+#*** Gs
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=gs, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179) + geom_smooth(se=F, aes(pch=NULL))
+#*** E
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=E, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+#*** Amax
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=Amax, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+#*** lwp (without removing flags)
+# ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=lwp.m, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+#*** lwp (flags removed)
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=lwp.clean, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+#*** ABA
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=ABAFWngg, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+#*** WUE
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=WUE, col=treatment, pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+
+
+# *** Digging in to lwp ***
+
+# Each individual with loess smoother (visualizes my smoothing method)
+ggplot(enchilada, aes(x=DOY, y=lwp.clean, col=treatment)) + geom_point()+geom_smooth() + facet_wrap(facets = ~tag)
+
+# all individuals on one plot, smoother color=treatment
+  # uncleaned data (6s left in)
+# ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=lwp.m, col=treatment, shape=tag)) + geom_point()+geom_smooth(se=F) + geom_vline(xintercept=200)
+  # cleaned data (no 6s)
+# with ggplot smoother
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=lwp.clean, col=treatment, shape=tag)) + geom_point()+geom_smooth(se=F) + geom_vline(xintercept=200)
+# just with smoothed data from df
+ggplot(enchilada[which(enchilada$lwp.clean<1),], aes(x=DOY, y=lwp.clean, col=treatment, shape=tag)) + geom_point() + geom_vline(xintercept=200) + geom_line(aes(y=lwp.smooth))
+# smoothed by treatment (from smoothed lwp)
+ggplot(enchilada[which(enchilada$DOY>170),], aes(x=DOY, y=lwp.smooth, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)  + geom_smooth(se=F, aes(pch=NULL))
+
+
+#_________________________________________________________
+####### PhysVariable SCATTERPLOT FIGURES #########
+#_________________________________________________________
+
+
+### ABA vs GS (with pre-treatment excluded)
+ggplot(enchilada[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), col=treatment, shape=water.status)) + geom_point() #+ geom_smooth(se=F,method = "loess",span=1)
+
+# Gs vs LWP and ABA vs LWP
+ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.clean, y=log(gs), col=treatment)) + geom_point() 
+ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28" ),], aes(x=ABAFWngg, y=lwp.clean, col=treatment, shape=water.status)) + geom_point()
+
+# Gs and ABA vs LWP.smooth
+ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.smooth, y=log(gs), col=treatment)) + geom_point() 
+ggplot(enchilada[which(enchilada$ABAFWngg>0 & enchilada$Date>"2018-06-28" ),], aes(x=ABAFWngg, y=lwp.smooth, col=treatment, shape=water.status)) + geom_point()
+  # ABA actually starts to look ok against the smoothed wp. Gs still looks like shit though
+
+
+# GS 
+
+
+
+
+ggplot(enchilada, aes(x=gs, y=Amax, col=water.status, pch=water.status)) + geom_point()+facet_wrap(facets=~tag)
+
+
+ggplot(enchilada, aes(x=gs, y=WUE, col=water.status, pch=water.status)) + geom_point()+facet_wrap(facets=~tag)
+
+ggplot(enchilada[which(enchilada$flags==0),], aes(x=Date, y=lwp.m, col=water.status, pch=water.status)) + geom_point()+facet_wrap(facets=~tag)
+
+ggplot(enchilada[which(enchilada$flags==0),], aes(x=Date, y=lwp.m, col=factor(treatment), pch=water.status)) + geom_point() + geom_smooth(se=F, col=treatment)
+
+
+ggplot(enchilada, aes(x=DOY, y=gs, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179)
+
+
+ggplot(enchilada, aes(x=DOY, y=E, col=factor(treatment), pch=water.status)) + geom_point() + geom_vline(xintercept=179) + geom_vline(xintercept=200) + geom_smooth(aes(col=tag))
 
 
 # visualizing individual WPs in different panels
@@ -200,7 +381,7 @@ ggplot(gsaba[which(gsaba$Date>"2018-06-28"),], aes(x=log(ABAFWngg), y=log(gs), c
 
 # Gs vs LWP
 quartz(width=5, height=6)
-ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point()
+ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=lwp.m, y=log(gs), col=log(ABAFWngg) )) + geom_point() 
 
 #quartz(width=5, height=6)
 #ggplot(enchilada[which(enchilada$ABAFWngg>0),], aes(x=minlwp, y=log(gs), col=log(ABAFWngg) )) + geom_point()
